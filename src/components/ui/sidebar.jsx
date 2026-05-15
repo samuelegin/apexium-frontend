@@ -218,6 +218,24 @@ Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef(({ className, onClick, asChild = false, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
+  const pointerTouched = React.useRef(false)
+
+  const handlePointerDown = (event) => {
+    // mark that we handled the interaction via pointer/touch to avoid double-toggle
+    pointerTouched.current = true
+    onClick?.(event)
+    toggleSidebar()
+  }
+
+  const handleClick = (event) => {
+    // if a pointer/touch already triggered the toggle, ignore the subsequent click
+    if (pointerTouched.current) {
+      pointerTouched.current = false
+      return
+    }
+    onClick?.(event)
+    toggleSidebar()
+  }
 
   return (
     (<Button
@@ -225,11 +243,11 @@ const SidebarTrigger = React.forwardRef(({ className, onClick, asChild = false, 
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
+      // slightly larger hit area on mobile for easier tapping
+      className={cn("h-9 w-9 p-1 touch-manipulation", className)}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onTouchStart={handlePointerDown}
       asChild={asChild}
       {...props}>
       {asChild ? (
