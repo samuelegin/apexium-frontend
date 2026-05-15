@@ -42,6 +42,7 @@ function AuthenticatedApp() {
   if (!isAuthenticated) {
     return (
       <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -49,6 +50,8 @@ function AuthenticatedApp() {
 
   return (
     <Routes>
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
       {/* ── Admin — completely outside AppLayout, its own full-screen layout ── */}
       <Route path="/admin" element={<AdminPanel />} />
 
@@ -68,7 +71,6 @@ function AuthenticatedApp() {
         <Route path="/xp-activity"    element={<XPActivity />} />
         <Route path="/pods"           element={<Pods />} />
         <Route path="*"               element={<PageNotFound />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
     </Routes>
   );
