@@ -81,8 +81,14 @@ export default function Profile() {
           <div className="flex flex-col sm:flex-row items-center gap-6">
             {/* Avatar */}
             <div className="relative group">
-              <Avatar className="w-24 h-24">
-                <AvatarImage src={avatarUrl} />
+              <Avatar key={avatarUrl} className="w-24 h-24">
+                <AvatarImage
+                  src={avatarUrl}
+                  onError={() => {
+                    toast.error('Failed to load avatar image');
+                    setAvatarUrl('');
+                  }}
+                />
                 <AvatarFallback className="bg-secondary text-muted-foreground text-2xl">
                   {user?.full_name?.[0] || <User className="w-8 h-8" />}
                 </AvatarFallback>
