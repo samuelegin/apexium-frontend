@@ -21,6 +21,7 @@ import Referrals      from '@/pages/Referrals';
 import XPActivity     from '@/pages/XPActivity';
 import AdminPanel     from '@/pages/AdminPanel';
 import Pods           from '@/pages/Pods';
+import AuthCallback from '@/pages/AuthCallback';
 
 import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
@@ -67,6 +68,7 @@ function AuthenticatedApp() {
         <Route path="/xp-activity"    element={<XPActivity />} />
         <Route path="/pods"           element={<Pods />} />
         <Route path="*"               element={<PageNotFound />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
     </Routes>
   );
