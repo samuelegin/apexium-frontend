@@ -45,8 +45,31 @@ export default function Profile() {
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const { file_url } = await auth.uploadFile(file);
-    setAvatarUrl(file_url);
+    
+    try {
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image must be less than 5MB');
+        return;
+      }
+      
+      const { file_url } = await auth.uploadFile(file);
+      // Add cache-busting query parameter to force fresh load
+      const cachedUrl = `${file_url}?t=${Date.now()}`;
+      
+      // Auto-save to backend immediately
+      await updateProfile({
+        username: username.replace('@', ''),
+        bio,
+        avatar_url: cachedUrl,
+        x_handle: xHandle ? (xHandle.startsWith('@') ? xHandle : `@${xHandle}`) : '',
+      });
+      
+      setAvatarUrl(cachedUrl);
+      toast.success('Avatar updated!');
+    } catch (error) {
+      toast.error(`Failed to update avatar: ${error.message}`);
+    }
   };
 
   return (
