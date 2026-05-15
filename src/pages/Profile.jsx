@@ -45,30 +45,47 @@ export default function Profile() {
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     try {
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Image must be less than 5MB');
         return;
       }
-      
-      const { file_url } = await auth.uploadFile(file);
+
+      // Show a local preview immediately so user sees their selection
+      const previewUrl = URL.createObjectURL(file);
+      setAvatarUrl(previewUrl);
+      toast.success('Uploading avatar...');
+
+      const res = await auth.uploadFile(file);
+      console.log('avatar upload response', res);
+      if (!res || !res.file_url) throw new Error('No file_url returned from upload');
+
       // Add cache-busting query parameter to force fresh load
-      const cachedUrl = `${file_url}?t=${Date.now()}`;
-      
+      const cachedUrl = `${res.file_url}?t=${Date.now()}`;
+
       // Auto-save to backend immediately
-      await updateProfile({
-        username: username.replace('@', ''),
-        bio,
-        avatar_url: cachedUrl,
-        x_handle: xHandle ? (xHandle.startsWith('@') ? xHandle : `@${xHandle}`) : '',
-      });
-      
+      try {
+        await updateProfile({
+          username: username.replace('@', ''),
+          bio,
+          avatar_url: cachedUrl,
+          x_handle: xHandle ? (xHandle.startsWith('@') ? xHandle : `@${xHandle}`) : '',
+        });
+        toast.success('Avatar updated!');
+      } catch (err) {
+        console.error('failed to save profile avatar_url', err);
+        toast.error('Uploaded image but failed to save profile');
+      }
+
+      // Replace preview with final CDN URL
       setAvatarUrl(cachedUrl);
-      toast.success('Avatar updated!');
+      // revoke the local preview URL now that we're using the remote URL
+      try { URL.revokeObjectURL(previewUrl); } catch (e) {}
     } catch (error) {
-      toast.error(`Failed to update avatar: ${error.message}`);
+      console.error('avatar upload error', error);
+      toast.error(`Failed to upload avatar: ${error.message}`);
     }
   };
 
