@@ -24,6 +24,9 @@ export default function JobCard({ job }) {
               {job.status === 'in_progress' && (
                 <Badge className="bg-chart-3/20 text-chart-3 text-xs">Active</Badge>
               )}
+              {job.status === 'completed' && (
+                <Badge className="bg-emerald/20 text-emerald text-xs">Completed</Badge>
+              )}
             </div>
             <h3 className="font-semibold text-foreground text-base md:text-lg group-hover:text-primary transition-colors truncate">
               {job.title}
