@@ -57,7 +57,7 @@ function EmployerDashboard({ user }) {
         </div>
         <Link to="/post-job">
           <Button className="bg-primary text-primary-foreground gap-2">
-            <Plus className="w-4 h-4" /> Post KPI Job
+            <Plus className="w-4 h-4" /> Post Job
           </Button>
         </Link>
       </div>

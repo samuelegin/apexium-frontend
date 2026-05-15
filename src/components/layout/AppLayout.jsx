@@ -116,7 +116,7 @@ export default function AppLayout() {
           {isEmployer ? (
             <Link to="/post-job">
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
-                <Plus className="w-4 h-4" /> Post KPI Job
+                <Plus className="w-4 h-4" /> Post Job
               </Button>
             </Link>
           ) : (
@@ -193,7 +193,7 @@ export default function AppLayout() {
               <div className="pt-4">
                 {isEmployer ? (
                   <Link to="/post-job" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full bg-primary text-primary-foreground gap-2"><Plus className="w-4 h-4" /> Post KPI Job</Button>
+                    <Button className="w-full bg-primary text-primary-foreground gap-2"><Plus className="w-4 h-4" /> Post Job</Button>
                   </Link>
                 ) : (
                   <Link to="/marketplace" onClick={() => setMobileOpen(false)}>

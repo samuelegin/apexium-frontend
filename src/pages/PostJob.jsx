@@ -130,7 +130,7 @@ export default function PostJob() {
         <Button variant="ghost" size="icon" onClick={() => step > 1 ? setStep(step - 1) : navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-xl font-bold text-foreground">Post KPI Job</h1>
+        <h1 className="text-xl font-bold text-foreground">Post Job</h1>
       </div>
 
       <StepIndicator current={step} />
