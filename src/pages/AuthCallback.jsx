@@ -1,9 +1,12 @@
 /**
- * AuthCallback.jsx — handles the redirect from Google OAuth
- * Route: /auth/callback?token=xxx
+ * AuthCallback.jsx — handles the redirect from OAuth and Telegram connections
+ * Routes: 
+ *   - /auth/callback?token=xxx (login flow)
+ *   - /auth/callback?telegram_id=xxx&telegram_username=xxx (profile connection flow)
  *
- * Google → backend → redirects here with JWT in URL
- * We store the token and redirect to home
+ * Google/Login → backend → redirects here with JWT in URL
+ * Telegram profile → backend → redirects here with telegram data in URL
+ * We store the token and redirect, or pass through for profile params
  */
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -17,6 +20,8 @@ export default function AuthCallback() {
   useEffect(() => {
     const token = searchParams.get('token');
     const error = searchParams.get('error');
+    const telegramId = searchParams.get('telegram_id');
+    const telegramUsername = searchParams.get('telegram_username');
 
     if (error) {
       console.error('[auth-callback] Google auth failed:', error);
@@ -25,8 +30,13 @@ export default function AuthCallback() {
     }
 
     if (token) {
+      // Login flow: save token and redirect
       localStorage.setItem('apex_token', token);
       refetch().then(() => navigate('/', { replace: true }));
+    } else if (telegramId && telegramUsername) {
+      // Profile connection flow: TelegramProfileConnect will handle the params
+      // Just redirect to profile to avoid error
+      navigate('/profile', { replace: true });
     } else {
       navigate('/login', { replace: true });
     }

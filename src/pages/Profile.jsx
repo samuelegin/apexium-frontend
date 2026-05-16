@@ -12,6 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import PIScoreGauge from '@/components/shared/PIScoreGauge';
 import XPBadge, { getProgress, getNextThreshold } from '@/components/growth/XPBadge';
+import TelegramProfileConnect from '@/components/TelegramProfileConnect';
 import auth from '@/api/authApi';
 
 export default function Profile() {
@@ -290,6 +291,13 @@ export default function Profile() {
           })()}
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <TelegramProfileConnect
+          telegramId={user?.telegram_id}
+          telegramUsername={user?.telegram_username}
+        />
+      </div>
 
       <Button
         variant="outline"
