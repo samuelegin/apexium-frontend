@@ -13,11 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 const TELEGRAM_WIDGET_HOST = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 export default function TelegramProfileConnect({ telegramId, telegramUsername }) {
-  const { updateProfile, refetch } = useAuth();
+  const { updateProfile, refetch, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [connecting, setConnecting] = useState(false);
   const [processingCallback, setProcessingCallback] = useState(false);
+  const [savedUsername, setSavedUsername] = useState(null);
 
   // Handle Telegram callback (redirected from backend with telegram data in URL params)
   useEffect(() => {
@@ -34,6 +35,8 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
             telegram_username: String(username),
           });
           toast.success(`Telegram connected! (@${username})`);
+          // Store the saved username so it displays immediately
+          setSavedUsername(username);
           // Refetch to get updated user data
           await refetch();
           // Clear the URL params
@@ -55,7 +58,9 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
     window.location.href = `${TELEGRAM_WIDGET_HOST}/auth/telegram?origin=${encodeURIComponent(window.location.origin)}&callback_type=profile`;
   };
 
-  const isConnected = Boolean(telegramId && telegramUsername);
+  // Use savedUsername if just connected, otherwise use props
+  const displayUsername = savedUsername || telegramUsername;
+  const isConnected = Boolean(telegramId || displayUsername);
 
   if (processingCallback) {
     return (
@@ -84,7 +89,7 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-accent" />
               <span className="text-sm text-foreground">
-                Connected as <span className="font-semibold">@{telegramUsername}</span>
+                Connected as <span className="font-semibold">@{displayUsername}</span>
               </span>
             </div>
             <Button
