@@ -123,6 +123,7 @@ export default function JobDetail() {
         pod_name: isPod ? podName.trim() : undefined,
         pod_members: isPod ? podMembers : undefined,
         performance_snapshot: perfSnapshot,
+        file_url: user?.cv_url || undefined,
       });
       await Job.update(jobId, { applicant_count: (job.applicant_count || 0) + 1 });
       await Notification.create({

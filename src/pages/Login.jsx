@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useMode } from '@/lib/ModeContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle2, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import auth from '@/api/authApi';
 import api from '@/api/apiClient';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
 
 // ── Tabs: login | register | forgot ───────────────────────────────────────────
 export default function Login() {
-  const { login, refetch } = useAuth();
+  const { login, refetch, updateProfile } = useAuth();
+  const { switchMode } = useMode();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [tab,      setTab]      = useState('login');
+  const [roleSelectionOpen, setRoleSelectionOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('jobber');
+  const [cvFile, setCvFile] = useState(null);
+  const [cvUrl, setCvUrl] = useState('');
+  const [cvUploading, setCvUploading] = useState(false);
+  const [cvError, setCvError] = useState('');
   const [loading,  setLoading]  = useState(false);
   const [showPass, setShowPass] = useState(false);
 
@@ -59,8 +68,15 @@ export default function Login() {
     if (!email || !password) { setLoginErr('Please enter your email and password.'); return; }
     setLoading(true);
     try {
-      await login(email.trim(), password);
-      navigate('/', { replace: true });
+      const me = await login(email.trim(), password);
+      const confirmed = localStorage.getItem('apexium_mode_confirmed') === '1';
+      if (!confirmed) {
+        setSelectedRole('jobber');
+        setCvUrl(me?.cv_url || '');
+        setRoleSelectionOpen(true);
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
       const msg = err?.message ?? '';
       if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials') || msg.toLowerCase().includes('password')) {
@@ -124,7 +140,14 @@ export default function Login() {
     try {
       await auth.verifyEmail(pendingEmail, verificationCode);
       await refetch();
-      navigate('/', { replace: true });
+      const confirmed = localStorage.getItem('apexium_mode_confirmed') === '1';
+      if (!confirmed) {
+        setSelectedRole('jobber');
+        setCvUrl('');
+        setRoleSelectionOpen(true);
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
       const msg = err?.message ?? '';
       if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired')) {
@@ -185,7 +208,42 @@ export default function Login() {
       setForgotSent(true);
     }
   };
+  const handleCvUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
+    setCvError('');
+    setCvFile(file);
+    setCvUploading(true);
+
+    try {
+      const data = await auth.uploadFile(file);
+      if (!data?.file_url) throw new Error('Upload failed.');
+      setCvUrl(data.file_url);
+      toast.success('CV uploaded successfully.');
+    } catch (error) {
+      setCvError(error?.message || 'CV upload failed.');
+      setCvFile(null);
+      setCvUrl('');
+    } finally {
+      setCvUploading(false);
+    }
+  };
+
+  const handleRoleConfirm = async () => {
+    try {
+      switchMode(selectedRole);
+      localStorage.setItem('apexium_mode_confirmed', '1');
+      if (selectedRole === 'jobber' && cvUrl) {
+        await updateProfile({ cv_url: cvUrl });
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Unable to save selection.');
+      return;
+    }
+    setRoleSelectionOpen(false);
+    navigate('/', { replace: true });
+  };
   // ── Shared input style ─────────────────────────────────────────────────────
   const inputCls = "bg-card border-border";
 
@@ -473,6 +531,65 @@ export default function Login() {
         )}
 
       </div>
+      <Dialog open={roleSelectionOpen} onOpenChange={setRoleSelectionOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Choose your mode</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Select how you want to use Apexium. Employers can post work and review applicants; jobbers can apply and optionally upload a CV for employers to review.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { key: 'jobber', title: 'Jobber', description: 'Apply for work and upload your CV.', accent: 'bg-accent/5 border-accent/20 text-accent' },
+                { key: 'employer', title: 'Employer', description: 'Post jobs and select the best jobbers.', accent: 'bg-primary/5 border-primary/20 text-primary' },
+              ].map(option => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setSelectedRole(option.key)}
+                  className={`rounded-xl border p-4 text-left transition ${selectedRole === option.key ? `${option.accent} border-current shadow-sm` : 'border-border bg-secondary/50 hover:border-primary/60'}`}
+                >
+                  <div className="text-sm font-semibold text-foreground mb-2">{option.title}</div>
+                  <p className="text-xs text-muted-foreground">{option.description}</p>
+                </button>
+              ))}
+            </div>
+
+            {selectedRole === 'jobber' && (
+              <div className="rounded-xl border border-border bg-secondary/50 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Paperclip className="w-4 h-4" /> Upload your CV
+                </div>
+                <p className="text-xs text-muted-foreground">This file will be attached to your applications and shown to employers when they review candidates.</p>
+                <input
+                  type="file"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
+                  onChange={handleCvUpload}
+                  disabled={cvUploading}
+                  className="block w-full text-xs text-muted-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground hover:file:bg-primary/90"
+                />
+                {cvFile && (
+                  <p className="text-xs text-foreground">Selected: <span className="font-medium">{cvFile.name}</span></p>
+                )}
+                {cvError && (
+                  <p className="text-xs text-destructive">{cvError}</p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button
+              onClick={handleRoleConfirm}
+              disabled={cvUploading}
+              className="w-full bg-primary text-primary-foreground"
+            >
+              {cvUploading ? 'Saving…' : `Continue as ${selectedRole === 'jobber' ? 'Jobber' : 'Employer'}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

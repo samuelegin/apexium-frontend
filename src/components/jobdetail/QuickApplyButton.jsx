@@ -113,6 +113,7 @@ export default function QuickApplyButton({ user, job, jobId, onApplied }) {
         application_type: 'quick',
         is_pod: false,
         performance_snapshot: performanceSnapshot,
+        file_url: user?.cv_url || undefined,
       });
       await Job.update(jobId, { applicant_count: (job.applicant_count || 0) + 1 });
       await Notification.create({
