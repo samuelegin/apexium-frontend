@@ -69,9 +69,9 @@ export default function Login() {
     setLoading(true);
     try {
       const me = await login(email.trim(), password);
-      const confirmed = localStorage.getItem('apexium_mode_confirmed') === '1';
+      const confirmed = me?.mode_confirmed === 1 || me?.mode_confirmed === '1' || me?.mode_confirmed === true;
       if (!confirmed) {
-        setSelectedRole('jobber');
+        setSelectedRole(me?.selected_mode || 'jobber');
         setCvUrl(me?.cv_url || '');
         setRoleSelectionOpen(true);
       } else {
@@ -140,9 +140,10 @@ export default function Login() {
     try {
       await auth.verifyEmail(pendingEmail, verificationCode);
       await refetch();
-      const confirmed = localStorage.getItem('apexium_mode_confirmed') === '1';
+      const me = await auth.me();
+      const confirmed = me?.mode_confirmed === 1 || me?.mode_confirmed === '1' || me?.mode_confirmed === true;
       if (!confirmed) {
-        setSelectedRole('jobber');
+        setSelectedRole(me?.selected_mode || 'jobber');
         setCvUrl('');
         setRoleSelectionOpen(true);
       } else {
@@ -233,10 +234,11 @@ export default function Login() {
   const handleRoleConfirm = async () => {
     try {
       switchMode(selectedRole);
-      localStorage.setItem('apexium_mode_confirmed', '1');
-      if (selectedRole === 'jobber' && cvUrl) {
-        await updateProfile({ cv_url: cvUrl });
-      }
+      await updateProfile({
+        selected_mode: selectedRole,
+        mode_confirmed: 1,
+        ...(selectedRole === 'jobber' && cvUrl ? { cv_url: cvUrl } : {}),
+      });
     } catch (error) {
       toast.error(error?.message || 'Unable to save selection.');
       return;
