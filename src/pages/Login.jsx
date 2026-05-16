@@ -14,7 +14,7 @@ import GoogleAuthButton from '@/components/GoogleAuthButton';
 
 // ── Tabs: login | register | forgot ───────────────────────────────────────────
 export default function Login() {
-  const { login, refetch, updateProfile } = useAuth();
+  const { login, refetch, updateProfile, user } = useAuth();
   const { switchMode } = useMode();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -60,6 +60,16 @@ export default function Login() {
       setRegReferral(ref.trim().toUpperCase());
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!user) return;
+    const confirmed = user.mode_confirmed === 1 || user.mode_confirmed === '1' || user.mode_confirmed === true;
+    if (!confirmed && !roleSelectionOpen) {
+      setSelectedRole(user?.selected_mode || 'jobber');
+      setCvUrl(user?.cv_url || '');
+      setRoleSelectionOpen(true);
+    }
+  }, [user, roleSelectionOpen]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {

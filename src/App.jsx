@@ -29,7 +29,7 @@ import { WagmiProvider } from 'wagmi';
 import { wagmiConfig } from '@/lib/wagmi';
 
 function AuthenticatedApp() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -39,7 +39,7 @@ function AuthenticatedApp() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || (user && !(user.mode_confirmed === 1 || user.mode_confirmed === '1' || user.mode_confirmed === true))) {
     return (
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
