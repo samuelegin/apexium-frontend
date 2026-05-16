@@ -158,10 +158,10 @@ export default function Profile() {
                 <Paperclip className="w-5 h-5 text-primary" />
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <label htmlFor="cv-upload-input" className="inline-flex">
-                  <Button size="sm" variant="secondary" type="button">
+                <label htmlFor="cv-upload-input" className="inline-flex cursor-pointer">
+                  <span className="inline-flex items-center justify-center px-3 py-2 rounded-md text-sm bg-secondary/50 border border-border hover:bg-secondary transition-colors">
                     {cvUrl ? 'Replace CV' : 'Upload CV'}
-                  </Button>
+                  </span>
                 </label>
                 {cvUrl && (
                   <a
