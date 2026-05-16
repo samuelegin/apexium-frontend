@@ -1,7 +1,7 @@
 /**
  * TelegramAuthButton.jsx — opens a small page on backend that hosts the Telegram login widget
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 export default function TelegramAuthButton({ label = 'Continue with Telegram' }) {
   const handleClick = () => {
