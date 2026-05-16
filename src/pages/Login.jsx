@@ -43,16 +43,61 @@ export default function Login() {
   const [regReferral, setRegReferral] = useState('');
   const [regErr,      setRegErr]      = useState('');
 
-            {/* Sign in (email login temporarily disabled) */}
-            {tab === 'login' && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-muted-foreground">Email/password login is temporarily disabled. Use one of the options below to sign in.</p>
-                <GoogleAuthButton />
-                <div className="mt-3">
-                  <TelegramAuthButton />
-                </div>
-              </div>
-            )}
+  // email verification
+  const [verificationStep, setVerificationStep] = useState('register'); // 'register' | 'verify'
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // forgot password
+  const [forgotEmail,   setForgotEmail]   = useState('');
+  const [forgotSent,    setForgotSent]    = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  // Get referral code from URL
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setRegReferral(ref.trim().toUpperCase());
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!user) return;
+    const confirmed = user.mode_confirmed === 1 || user.mode_confirmed === '1' || user.mode_confirmed === true;
+    if (!confirmed && !roleSelectionOpen) {
+      setSelectedRole(user?.selected_mode || 'jobber');
+      setCvUrl(user?.cv_url || '');
+      setRoleSelectionOpen(true);
+    }
+  }, [user, roleSelectionOpen]);
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginErr('');
+    if (!email || !password) { setLoginErr('Please enter your email and password.'); return; }
+    setLoading(true);
+    try {
+      const me = await login(email.trim(), password);
+      const confirmed = me?.mode_confirmed === 1 || me?.mode_confirmed === '1' || me?.mode_confirmed === true;
+      if (!confirmed) {
+        setSelectedRole(me?.selected_mode || 'jobber');
+        setCvUrl(me?.cv_url || '');
+        setRoleSelectionOpen(true);
+      } else {
+        navigate('/', { replace: true });
+      }
+    } catch (err) {
+      const msg = err?.message ?? '';
+      if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials') || msg.toLowerCase().includes('password')) {
+        setLoginErr('Incorrect email or password. Please try again.');
+      } else if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('404')) {
+        setLoginErr('No account found with that email.');
+      } else {
+        setLoginErr(msg || 'Login failed. Please try again.');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -78,16 +123,136 @@ export default function Login() {
           if (prev <= 1) {
             clearInterval(interval);
             return 0;
-            {/* Create account (email registration temporarily disabled) */}
-            {tab === 'register' && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-muted-foreground">Email-based registration is temporarily disabled. Create an account using Google or Telegram.</p>
-                <GoogleAuthButton />
-                <div className="mt-3">
-                  <TelegramAuthButton />
-                </div>
-              </div>
-            )}
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      const msg = err?.message ?? '';
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('exists') || msg.toLowerCase().includes('duplicate')) {
+        setRegErr('An account with this email already exists.');
+      } else {
+        setRegErr(msg || 'Registration failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Verify Email ────────────────────────────────────────────────────────────
+  const handleVerifyEmail = async (e) => {
+    e.preventDefault();
+    setRegErr('');
+    if (!verificationCode || verificationCode.length !== 6) {
+      setRegErr('Please enter a valid 6-digit verification code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await auth.verifyEmail(pendingEmail, verificationCode);
+      await refetch();
+      const me = await auth.me();
+      const confirmed = me?.mode_confirmed === 1 || me?.mode_confirmed === '1' || me?.mode_confirmed === true;
+      if (!confirmed) {
+        setSelectedRole(me?.selected_mode || 'jobber');
+        setCvUrl('');
+        setRoleSelectionOpen(true);
+      } else {
+        navigate('/', { replace: true });
+      }
+    } catch (err) {
+      const msg = err?.message ?? '';
+      if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired')) {
+        setRegErr('Invalid or expired verification code.');
+      } else {
+        setRegErr(msg || 'Verification failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Resend Verification ─────────────────────────────────────────────────────
+  const handleResendVerification = async () => {
+    if (resendTimer > 0) return;
+    setRegErr('');
+    setLoading(true);
+    try {
+      await auth.resendVerification(pendingEmail);
+      setResendTimer(60);
+      const interval = setInterval(() => {
+        setResendTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      toast.success('Verification code sent!');
+    } catch (err) {
+      setRegErr('Failed to resend verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Back to Register ────────────────────────────────────────────────────────
+  const backToRegister = () => {
+    setVerificationStep('register');
+    setVerificationCode('');
+    setPendingEmail('');
+    setRegErr('');
+    setResendTimer(0);
+  };
+
+  // ── Forgot password ────────────────────────────────────────────────────────
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email: forgotEmail.trim() });
+    } catch (_) {
+      // Always show success — don't reveal if email exists
+    } finally {
+      setForgotLoading(false);
+      setForgotSent(true);
+    }
+  };
+  const handleCvUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setCvError('');
+    setCvFile(file);
+    setCvUploading(true);
+
+    try {
+      const data = await auth.uploadFile(file);
+      if (!data?.file_url) throw new Error('Upload failed.');
+      setCvUrl(data.file_url);
+      toast.success('CV uploaded successfully.');
+    } catch (error) {
+      setCvError(error?.message || 'CV upload failed.');
+      setCvFile(null);
+      setCvUrl('');
+    } finally {
+      setCvUploading(false);
+    }
+  };
+
+  const handleRoleConfirm = async () => {
+    try {
+      switchMode(selectedRole);
+      await updateProfile({
+        selected_mode: selectedRole,
+        mode_confirmed: 1,
+        ...(selectedRole === 'jobber' && cvUrl ? { cv_url: cvUrl } : {}),
+      });
+    } catch (error) {
+      toast.error(error?.message || 'Unable to save selection.');
+      return;
     }
     setRoleSelectionOpen(false);
     navigate('/', { replace: true });
