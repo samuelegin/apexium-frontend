@@ -5,8 +5,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api
 
 export default function TelegramAuthButton({ label = 'Continue with Telegram' }) {
   const handleClick = () => {
-    // Open the backend page that hosts the Telegram widget
-    window.location.href = `${API_BASE}/auth/telegram`;
+    // Open the backend page that hosts the Telegram widget (include origin for backend validation)
+    window.location.href = `${API_BASE}/auth/telegram?origin=${encodeURIComponent(window.location.origin)}`;
   };
 
   return (

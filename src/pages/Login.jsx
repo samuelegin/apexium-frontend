@@ -259,6 +259,29 @@ export default function Login() {
   };
   // ── Shared input style ─────────────────────────────────────────────────────
   const inputCls = "bg-card border-border";
+  const enableEmailAuth = import.meta.env.VITE_ENABLE_EMAIL_AUTH === 'true';
+
+  if (!enableEmailAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center space-y-1">
+            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-3">
+              <span className="text-primary-foreground font-bold text-xl">A</span>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Apexium</h1>
+            <p className="text-sm text-muted-foreground">KPI-based freelance marketplace</p>
+          </div>
+
+          <div className="space-y-4">
+            <GoogleAuthButton />
+            <TelegramAuthButton />
+            <p className="text-xs text-muted-foreground text-center mt-2">Email sign-in temporarily disabled.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
