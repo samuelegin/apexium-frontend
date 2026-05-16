@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 
 import { useMutation } from '@tanstack/react-query';
-import { User, Camera, Save, Loader2, LogOut, AtSign, Zap, AlertTriangle } from 'lucide-react';
+import { User, Camera, Save, Loader2, LogOut, AtSign, Zap, AlertTriangle, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import PIScoreGauge from '@/components/shared/PIScoreGauge';
-import XPBadge, { getLevel, getProgress, getNextThreshold } from '@/components/growth/XPBadge';
+import XPBadge, { getProgress, getNextThreshold } from '@/components/growth/XPBadge';
 import auth from '@/api/authApi';
 
 export default function Profile() {
@@ -19,6 +19,7 @@ export default function Profile() {
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [cvUrl, setCvUrl] = useState('');
   const [xHandle, setXHandle] = useState('');
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function Profile() {
       setUsername(user.username || '');
       setBio(user.bio || '');
       setAvatarUrl(user.avatar_url || '');
+      setCvUrl(user.cv_url || '');
       setXHandle(user.x_handle || '');
     }
   }, [user]);
@@ -89,6 +91,31 @@ export default function Profile() {
     }
   };
 
+  const handleCvUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('CV must be less than 5MB');
+        return;
+      }
+
+      toast.success('Uploading CV...');
+      const res = await auth.uploadFile(file);
+      console.log('cv upload response', res);
+      if (!res || !res.file_url) throw new Error('No file_url returned from upload');
+
+      const cachedUrl = `${res.file_url}?t=${Date.now()}`;
+      await updateProfile({ cv_url: cachedUrl });
+      setCvUrl(cachedUrl);
+      toast.success('CV uploaded successfully!');
+    } catch (error) {
+      console.error('cv upload error', error);
+      toast.error(`Failed to upload CV: ${error.message}`);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto pb-20 lg:pb-8 space-y-6">
       <h1 className="text-2xl md:text-3xl font-bold text-foreground">Profile</h1>
@@ -120,6 +147,43 @@ export default function Profile() {
               <p className="text-sm text-muted-foreground">{user?.email}</p>
               {username && <p className="text-sm text-primary mt-1">@{username}</p>}
             </div>
+          </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <Card className="border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Resume</p>
+                  <p className="text-sm text-foreground mt-1">{cvUrl ? 'Saved to your profile' : 'No CV uploaded yet'}</p>
+                </div>
+                <Paperclip className="w-5 h-5 text-primary" />
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => document.getElementById('cv-upload-input')?.click()}
+                >
+                  {cvUrl ? 'Replace CV' : 'Upload CV'}
+                </Button>
+                {cvUrl && (
+                  <a
+                    href={cvUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary underline underline-offset-2"
+                  >
+                    View CV
+                  </a>
+                )}
+              </div>
+              <input
+                id="cv-upload-input"
+                type="file"
+                accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleCvUpload}
+                className="hidden"
+              />
+            </Card>
           </div>
         </CardContent>
       </Card>
