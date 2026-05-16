@@ -158,13 +158,11 @@ export default function Profile() {
                 <Paperclip className="w-5 h-5 text-primary" />
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => document.getElementById('cv-upload-input')?.click()}
-                >
-                  {cvUrl ? 'Replace CV' : 'Upload CV'}
-                </Button>
+                <label htmlFor="cv-upload-input" className="inline-flex">
+                  <Button size="sm" variant="secondary" type="button">
+                    {cvUrl ? 'Replace CV' : 'Upload CV'}
+                  </Button>
+                </label>
                 {cvUrl && (
                   <a
                     href={cvUrl}
