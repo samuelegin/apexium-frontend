@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import auth from '@/api/authApi';
 import api from '@/api/apiClient';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
+import TelegramAuthButton from '@/components/TelegramAuthButton';
 
 // ── Tabs: login | register | forgot ───────────────────────────────────────────
 export default function Login() {
@@ -382,6 +383,9 @@ export default function Login() {
                   {loading ? 'Signing in…' : 'Sign in'}
                 </Button>
                 <GoogleAuthButton />
+                <div className="mt-3">
+                  <TelegramAuthButton />
+                </div>
                 <div className="relative my-4">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border" />
@@ -456,6 +460,9 @@ export default function Login() {
                       {loading ? 'Sending verification…' : 'Send verification code'}
                     </Button>
                     <GoogleAuthButton />
+                    <div className="mt-3">
+                      <TelegramAuthButton />
+                    </div>
                     <div className="relative my-4">
                       <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t border-border" />
