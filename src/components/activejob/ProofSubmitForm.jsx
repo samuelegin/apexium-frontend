@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 import { useAuth } from '@/lib/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Link2, BarChart3, Loader2, Send, Shield, AlertTriangle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import auth from '@/api/authApi';
 import { Job, KPI, Notification, ProofSubmission } from '@/api/entities';
 
 const isValidUrl = (url) => {
@@ -23,8 +24,24 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
   const queryClient = useQueryClient();
   const [proofLink, setProofLink] = useState('');
   const [metricAchieved, setMetricAchieved] = useState('');
+  const [proofFile, setProofFile] = useState(null);
+  const [uploadedUrl, setUploadedUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [fileError, setFileError] = useState('');
   const [suspiciousCount, setSuspiciousCount] = useState(0);
   const lastSubmitAttempt = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      setProofLink('');
+      setMetricAchieved('');
+      setProofFile(null);
+      setUploadedUrl('');
+      setIsUploading(false);
+      setFileError('');
+      setSuspiciousCount(0);
+    }
+  }, [open]);
 
   // Anti-cheat: already submitted for this KPI?
   const alreadySubmitted = existingProofs.some(p => p.kpi_id === kpi.id);
@@ -35,7 +52,38 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
   // Validation state
   const urlValid = isValidUrl(proofLink);
   const metricFilled = metricAchieved.trim().length > 0;
-  const canSubmit = urlValid && !isDuplicateLink && metricFilled && !alreadySubmitted;
+  const canSubmit = (urlValid || uploadedUrl) && !isDuplicateLink && metricFilled && !alreadySubmitted;
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setFileError('');
+    setProofFile(file);
+    setIsUploading(true);
+
+    try {
+      const data = await auth.uploadFile(file);
+      if (!data?.file_url) throw new Error('Upload did not return a file URL.');
+      setUploadedUrl(data.file_url);
+      setProofLink(data.file_url);
+      toast.success('File uploaded successfully.');
+    } catch (error) {
+      setFileError(error?.message || 'File upload failed.');
+      setProofFile(null);
+      setUploadedUrl('');
+      setProofLink('');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setProofFile(null);
+    setUploadedUrl('');
+    setProofLink('');
+    setFileError('');
+  };
 
   const handleSuspiciousAttempt = () => {
     const now = Date.now();
@@ -76,6 +124,9 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
       onClose();
       setProofLink('');
       setMetricAchieved('');
+      setProofFile(null);
+      setUploadedUrl('');
+      setFileError('');
     },
   });
 
@@ -131,18 +182,49 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
         )}
 
         <div className="space-y-4 mt-1">
-          {/* Proof Link */}
+          {/* Proof Link or File */}
           <div>
             <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-              <Link2 className="w-3.5 h-3.5" /> Proof Link <span className="text-destructive">*</span>
+              <Link2 className="w-3.5 h-3.5" /> Proof Link or File <span className="text-destructive">*</span>
             </Label>
-            <Input
-              placeholder="https://..."
-              value={proofLink}
-              onChange={(e) => setProofLink(e.target.value)}
-              className="bg-secondary/50 border-border"
-            />
-            {proofLink && !urlValid && (
+            <div className="space-y-2">
+              <Input
+                placeholder="https://..."
+                value={proofLink}
+                onChange={(e) => {
+                  setProofLink(e.target.value);
+                  if (uploadedUrl) {
+                    setUploadedUrl('');
+                    setProofFile(null);
+                  }
+                }}
+                className="bg-secondary/50 border-border"
+              />
+              <input
+                type="file"
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                onChange={handleFileChange}
+                disabled={isUploading}
+                className="block w-full text-xs text-muted-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground hover:file:bg-primary/90"
+              />
+            </div>
+            {proofFile && (
+              <div className="mt-2 text-xs text-foreground">
+                Uploaded file: <span className="font-medium">{proofFile.name}</span>
+                <button type="button" className="ml-2 text-primary underline" onClick={handleRemoveFile}>
+                  Remove
+                </button>
+              </div>
+            )}
+            {isUploading && (
+              <p className="text-xs text-muted-foreground mt-1">Uploading file…</p>
+            )}
+            {fileError && (
+              <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> {fileError}
+              </p>
+            )}
+            {proofLink && !urlValid && !uploadedUrl && (
               <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> Link must start with http:// or https://
               </p>
@@ -173,7 +255,7 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
           {/* Helper hint */}
           <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
             <Shield className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
-            <span>Submit verifiable results using links (e.g. screenshots, analytics pages). Once submitted, proof cannot be edited.</span>
+            <span>Submit verifiable results with a link or file upload (images, docs, videos). Once submitted, proof cannot be edited.</span>
           </div>
 
           {!canSubmit && proofLink && metricAchieved && (
