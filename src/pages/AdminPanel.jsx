@@ -122,7 +122,7 @@ export default function AdminPanel() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-semibold text-foreground text-sm">{task.title}</span>
-                      <Badge className={task.is_active ? 'bg-accent/20 text-accent border-0 text-xs' : 'bg-secondary text-muted-foreground border-0 text-xs'}>
+                      <Badge className={task.is_active ? 'bg-chart-1/20 text-chart-1 border-0 text-xs' : 'bg-secondary text-muted-foreground border-0 text-xs'}>
                         {task.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                       <Badge className="bg-primary/20 text-primary border-0 text-xs flex items-center gap-0.5">

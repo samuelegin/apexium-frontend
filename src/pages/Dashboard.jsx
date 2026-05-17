@@ -214,7 +214,7 @@ function JobberDashboard({ user }) {
                 return next ? (
                   <div>
                     <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: `${progress}%` }} />
+                      <div className="h-full bg-chart-1 rounded-full" style={{ width: `${progress}%` }} />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{next - xp} XP to next level</p>
                   </div>

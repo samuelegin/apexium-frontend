@@ -4,7 +4,7 @@ const XP_LEVELS = [
   { min: 0,    max: 199,  label: 'Recruit',   color: 'text-muted-foreground' },
   { min: 200,  max: 499,  label: 'Hustler',   color: 'text-primary' },
   { min: 500,  max: 999,  label: 'Performer', color: 'text-chart-3' },
-  { min: 1000, max: 2499, label: 'Elite',     color: 'text-accent' },
+  { min: 1000, max: 2499, label: 'Elite',     color: 'text-chart-1' },
   { min: 2500, max: Infinity, label: 'Legend', color: 'text-chart-5' },
 ];
 
