@@ -222,7 +222,7 @@ function JobberDashboard({ user }) {
               })()}
               <div className="flex gap-2">
                 <Link to="/tasks" className="flex-1">
-                  <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs border-accent/30 text-accent hover:bg-accent/10">
+                  <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs border-accent/30 text-foreground hover:bg-accent/10">
                     <CheckSquare className="w-3.5 h-3.5" /> Tasks
                   </Button>
                 </Link>
