@@ -13,7 +13,7 @@ export default function PIScoreGauge({ score, size = 'lg' }) {
   const offset = circumference - (score / 100) * circumference;
 
   const getColor = (s) => {
-    if (s >= 80) return 'hsl(var(--accent))';
+    if (s >= 80) return 'hsl(var(--chart-1))';
     if (s >= 50) return 'hsl(var(--chart-3))';
     if (s >= 25) return 'hsl(var(--chart-1))';
     return 'hsl(var(--destructive))';
