@@ -108,10 +108,6 @@ export default function AppLayout() {
             </Link>
           </div>
         )}
-        <div className="px-4 pb-3">
-          <WalletButton />
-        </div>
-
         <div className="p-4 border-t border-border">
           {isEmployer ? (
             <Link to="/post-job">
@@ -190,7 +186,7 @@ export default function AppLayout() {
                   <ChevronRight className="w-4 h-4 ml-auto opacity-40" />
                 </Link>
               )}
-              <div className="pt-4">
+              <div className="pt-4 space-y-3">
                 {isEmployer ? (
                   <Link to="/post-job" onClick={() => setMobileOpen(false)}>
                     <Button className="w-full bg-primary text-primary-foreground gap-2"><Plus className="w-4 h-4" /> Post Job</Button>
@@ -200,6 +196,7 @@ export default function AppLayout() {
                     <Button className="w-full bg-accent text-accent-foreground gap-2"><Search className="w-4 h-4" /> Find Work</Button>
                   </Link>
                 )}
+                <WalletButton />
               </div>
             </nav>
           </motion.div>
