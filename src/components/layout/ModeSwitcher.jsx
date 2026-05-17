@@ -34,7 +34,7 @@ export default function ModeSwitcher({ collapsed = false }) {
           className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium w-full
             ${isEmployer
               ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
-              : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
+              : 'border-chart-1/40 bg-chart-1/10 text-chart-1 hover:bg-chart-1/15'
             }`}
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -64,14 +64,14 @@ export default function ModeSwitcher({ collapsed = false }) {
         </div>
         <DropdownMenuItem
           onClick={() => handleSwitch('jobber')}
-          className={`gap-2 cursor-pointer ${mode === 'jobber' ? 'bg-accent/10 text-accent' : ''}`}
+          className={`gap-2 cursor-pointer ${mode === 'jobber' ? 'bg-chart-1/10 text-chart-1' : ''}`}
         >
           <Search className="w-4 h-4" />
           <div>
             <div className="font-medium">Jobber Mode</div>
             <div className="text-xs text-muted-foreground">Find & complete work</div>
           </div>
-          {mode === 'jobber' && <span className="ml-auto text-accent text-xs">●</span>}
+          {mode === 'jobber' && <span className="ml-auto text-chart-1 text-xs">●</span>}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => handleSwitch('employer')}
