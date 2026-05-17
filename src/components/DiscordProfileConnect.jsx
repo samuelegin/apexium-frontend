@@ -1,18 +1,18 @@
 /**
- * TelegramProfileConnect.jsx — allows users to connect Telegram to their profile post-login
- * Handles the Telegram auth callback and saves telegram_id + telegram_username to user profile
+ * DiscordProfileConnect.jsx — allows users to connect Discord to their profile post-login
+ * Handles the Discord OAuth2 callback and saves discord_id + discord_username to user profile
  */
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
-import { MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Users, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const TELEGRAM_WIDGET_HOST = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const DISCORD_WIDGET_HOST = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
-export default function TelegramProfileConnect({ telegramId, telegramUsername }) {
+export default function DiscordProfileConnect({ discordId, discordUsername }) {
   const { updateProfile, refetch, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -20,21 +20,21 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
   const [processingCallback, setProcessingCallback] = useState(false);
   const [savedUsername, setSavedUsername] = useState(null);
 
-  // Handle Telegram callback (redirected from backend with telegram data in URL params)
+  // Handle Discord callback (redirected from backend with Discord data in URL params)
   useEffect(() => {
-    const id = searchParams.get('telegram_id');
-    const username = searchParams.get('telegram_username');
+    const id = searchParams.get('discord_id');
+    const username = searchParams.get('discord_username');
 
     if (id && username && !processingCallback) {
       setProcessingCallback(true);
       (async () => {
         try {
-          // Save telegram data to profile
+          // Save Discord data to profile
           await updateProfile({
-            telegram_id: String(id),
-            telegram_username: String(username),
+            discord_id: String(id),
+            discord_username: String(username),
           });
-          toast.success(`Telegram connected! (@${username})`);
+          toast.success(`Discord connected! (@${username})`);
           // Store the saved username so it displays immediately
           setSavedUsername(username);
           // Refetch to get updated user data
@@ -42,8 +42,8 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
           // Clear the URL params
           navigate('/profile', { replace: true });
         } catch (err) {
-          console.error('[telegramConnect] error saving:', err);
-          toast.error('Failed to save Telegram connection');
+          console.error('[discordConnect] error saving:', err);
+          toast.error('Failed to save Discord connection');
           navigate('/profile', { replace: true });
         } finally {
           setProcessingCallback(false);
@@ -59,13 +59,13 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
       setConnecting(false);
       return;
     }
-    // Send user to backend Telegram widget, passing current user ID so backend knows who to update
-    window.location.href = `${TELEGRAM_WIDGET_HOST}/auth/telegram?origin=${encodeURIComponent(window.location.origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
+    // Send user to backend Discord OAuth, passing current user ID so backend knows who to update
+    window.location.href = `${DISCORD_WIDGET_HOST}/auth/discord?origin=${encodeURIComponent(window.location.origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
   };
 
   // Use savedUsername if just connected, otherwise use props
-  const displayUsername = savedUsername || telegramUsername;
-  const isConnected = Boolean(telegramId || displayUsername);
+  const displayUsername = savedUsername || discordUsername;
+  const isConnected = Boolean(discordId || displayUsername);
 
   if (processingCallback) {
     return (
@@ -73,7 +73,7 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
         <CardContent className="p-6 flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
-            <p className="text-sm text-muted-foreground">Connecting Telegram...</p>
+            <p className="text-sm text-muted-foreground">Connecting Discord...</p>
           </div>
         </CardContent>
       </Card>
@@ -84,8 +84,8 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
     <Card className={`border-border bg-card ${isConnected ? 'border-accent/30' : ''}`}>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <MessageCircle className="w-4 h-4" />
-          Telegram
+          <Users className="w-4 h-4" />
+          Discord
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -110,7 +110,7 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Connect your Telegram account so employers can reach you and see your Telegram username on job postings.
+              Connect your Discord account so employers can reach you and see your Discord username on job postings.
             </p>
             <Button
               onClick={handleConnectClick}
@@ -124,8 +124,8 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
                 </>
               ) : (
                 <>
-                  <MessageCircle className="w-4 h-4" />
-                  Connect Telegram
+                  <Users className="w-4 h-4" />
+                  Connect Discord
                 </>
               )}
             </Button>

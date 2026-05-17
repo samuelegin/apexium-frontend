@@ -1,27 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-
 import { useAuth } from '@/lib/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Zap, LogIn, CheckSquare, Users, Briefcase, FileCheck } from 'lucide-react';
 import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 import XPBadge from '@/components/growth/XPBadge';
 import { getLevel, getProgress, getNextThreshold } from '@/components/growth/XPBadge';
 import { XPLog } from '@/api/entities';
 
 const SOURCE_CONFIG = {
-  daily_login:     { icon: LogIn,      color: 'text-primary',    label: 'Daily Login' },
-  task_completed:  { icon: CheckSquare, color: 'text-accent',    label: 'Task Completed' },
-  referral_signup: { icon: Users,       color: 'text-chart-4',   label: 'Referral' },
-  referral_bonus:  { icon: Users,       color: 'text-chart-4',   label: 'Referral Bonus' },
-  proof_submitted: { icon: FileCheck,   color: 'text-chart-3',   label: 'Proof Submitted' },
-  job_completed:   { icon: Briefcase,   color: 'text-chart-5',   label: 'Job Completed' },
+  daily_login:     { icon: LogIn,       color: 'text-primary bg-primary/10',                          label: 'Daily Login' },
+  task_completed:  { icon: CheckSquare, color: 'text-primary bg-primary/10',                          label: 'Task Completed' },
+  referral_signup: { icon: Users,       color: 'text-violet-600 bg-violet-100 dark:bg-violet-950/40', label: 'Referral' },
+  referral_bonus:  { icon: Users,       color: 'text-violet-600 bg-violet-100 dark:bg-violet-950/40', label: 'Referral Bonus' },
+  proof_submitted: { icon: FileCheck,   color: 'text-amber-600 bg-amber-100 dark:bg-amber-950/40',    label: 'Proof Submitted' },
+  job_completed:   { icon: Briefcase,   color: 'text-blue-600 bg-blue-100 dark:bg-blue-950/40',       label: 'Job Completed' },
 };
 
 export default function XPActivity() {
   const { user } = useAuth();
-  const xp = user?.xp_total || 0;
-  const level = getLevel(xp);
-  const progress = getProgress(xp);
+  const xp            = user?.xp_total || 0;
+  const level         = getLevel(xp);
+  const progress      = getProgress(xp);
   const nextThreshold = getNextThreshold(xp);
 
   const { data: logs = [], isLoading } = useQuery({
@@ -31,84 +30,86 @@ export default function XPActivity() {
   });
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-20 lg:pb-8">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">XP Activity</h1>
+        <h1 className="text-2xl font-semibold text-foreground">XP Activity</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Your engagement history and XP earnings.</p>
       </div>
 
-      {/* XP Summary */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Your Rank</p>
-              <XPBadge xp={xp} size="lg" />
+      {/* XP summary card */}
+      <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Your Rank</p>
+            <XPBadge xp={xp} size="lg" />
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-semibold text-foreground font-mono">{xp.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Total XP</p>
+          </div>
+        </div>
+
+        {nextThreshold ? (
+          <div>
+            <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+              <span>{level?.label}</span>
+              <span>{xp} / {nextThreshold} XP</span>
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-foreground">{xp.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Total XP</p>
+            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-700"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
-          {nextThreshold && (
-            <div>
-              <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                <span>{level.label}</span>
-                <span>{xp} / {nextThreshold} XP</span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{nextThreshold - xp} XP to next level</p>
-            </div>
-          )}
-          {!nextThreshold && (
-            <p className="text-xs text-accent font-medium">Maximum rank reached! 🏆</p>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+          <p className="text-xs text-primary font-medium">Max rank achieved! 🏆</p>
+        )}
+      </div>
 
       {/* Log */}
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base text-foreground">Activity Log</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading && (
-            <div className="space-y-3">
-              {[1,2,3,4].map(i => <div key={i} className="h-12 bg-secondary/30 rounded-lg animate-pulse" />)}
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-3">History</h2>
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-14 rounded-2xl" />)}
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-card py-12 text-center">
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3">
+              <Zap className="w-5 h-5 text-muted-foreground" />
             </div>
-          )}
-          {!isLoading && logs.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground">
-              <Zap className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No XP earned yet. Complete tasks or log in daily!</p>
-            </div>
-          )}
-          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">No XP earned yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
             {logs.map(log => {
-              const cfg = SOURCE_CONFIG[log.source] || SOURCE_CONFIG.task_completed;
+              const cfg  = SOURCE_CONFIG[log.source] || { icon: Zap, color: 'text-muted-foreground bg-secondary', label: log.source };
               const Icon = cfg.icon;
               return (
-                <div key={log.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <Icon className={`w-4 h-4 ${cfg.color}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-foreground">{log.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {log.created_date ? format(new Date(log.created_date), 'MMM d, yyyy · h:mm a') : ''}
-                      </p>
-                    </div>
+                <div key={log.id} className="flex items-center gap-3 p-4 rounded-2xl border border-border bg-card">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${cfg.color}`}>
+                    <Icon className="w-4 h-4" />
                   </div>
-                  <span className="font-bold text-accent text-sm font-mono">+{log.xp_amount} XP</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{cfg.label}</p>
+                    {log.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.description}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-primary font-mono">+{log.xp_earned}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {log.created_date ? format(new Date(log.created_date), 'MMM d') : ''}
+                    </p>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }

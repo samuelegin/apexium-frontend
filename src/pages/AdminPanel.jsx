@@ -164,9 +164,9 @@ export default function AdminPanel() {
           </DialogHeader>
           <div className="space-y-3">
             {[
-              { key: 'title',            label: 'Task Title *',        placeholder: 'e.g. Post about Apexium on X' },
-              { key: 'required_action',  label: 'Required Action *',   placeholder: 'e.g. Post a tweet mentioning @Apexium' },
-              { key: 'required_keyword', label: 'Required Keyword *',  placeholder: 'e.g. @Apexium' },
+              { key: 'title',            label: 'Task Title *',        placeholder: 'e.g. Post about Work3Labs on X' },
+              { key: 'required_action',  label: 'Required Action *',   placeholder: 'e.g. Post a tweet mentioning @Work3Labs' },
+              { key: 'required_keyword', label: 'Required Keyword *',  placeholder: 'e.g. @Work3Labs' },
             ].map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label className="text-xs text-muted-foreground mb-1 block">{label}</label>

@@ -11,19 +11,19 @@ export const JOBBER_ONLY_PATHS = ['/marketplace'];
 export function ModeProvider({ children }) {
   const { user, updateProfile } = useAuth();
   const [mode, setMode] = useState(() => {
-    return localStorage.getItem('apexium_mode') || 'jobber';
+    return localStorage.getItem('work3labs_mode') || 'jobber';
   });
 
   useEffect(() => {
     if (!user?.selected_mode) return;
     if (mode === user.selected_mode) return;
     setMode(user.selected_mode);
-    localStorage.setItem('apexium_mode', user.selected_mode);
+    localStorage.setItem('work3labs_mode', user.selected_mode);
   }, [user?.selected_mode, mode]);
 
   const switchMode = useCallback((newMode) => {
     setMode(newMode);
-    localStorage.setItem('apexium_mode', newMode);
+    localStorage.setItem('work3labs_mode', newMode);
     if (user) {
       updateProfile({ selected_mode: newMode }).catch(() => {});
     }

@@ -13,7 +13,7 @@ const chains = isTestnet
 export const TARGET_CHAIN = chains[0];
 
 export const wagmiConfig = getDefaultConfig({
-  appName:   'Apexium',
+  appName:   'Work3Labs',
   projectId,
   chains,
   ssr:       false,

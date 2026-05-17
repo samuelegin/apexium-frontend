@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
     if (import.meta.env.VITE_MOCK_AUTH === 'true') {
       setUser({
         id: 'mock-user-1',
-        email: 'dev@apexium.com',
+        email: 'dev@work3labs.com',
         full_name: 'Dev User',
         username: 'devuser',
         role: 'user',

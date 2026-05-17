@@ -56,10 +56,10 @@ export default function AppLayout() {
       <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card fixed h-full z-30">
         <div className="p-6 border-b border-border">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Flame className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-background">
+              <img src="/logo.jpg" alt="Work3Labs logo" className="w-full h-full object-cover" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-foreground">Apexium</span>
+            <span className="text-lg font-bold tracking-tight text-foreground">Work3Labs</span>
           </Link>
         </div>
 
@@ -133,10 +133,10 @@ export default function AppLayout() {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Flame className="w-3.5 h-3.5 text-primary-foreground" />
+            <div className="w-7 h-7 rounded-lg overflow-hidden bg-background">
+              <img src="/logo.jpg" alt="Work3Labs logo" className="w-full h-full object-cover" />
             </div>
-            <span className="font-bold text-foreground">Apexium</span>
+            <span className="font-bold text-foreground">Work3Labs</span>
           </Link>
           <div className="flex items-center gap-2">
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${

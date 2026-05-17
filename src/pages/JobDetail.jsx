@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, DollarSign, Calendar, Users, Send, Loader2, CheckCircle2, User, Info, Crown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  ArrowLeft, DollarSign, Calendar, Users, Send,
+  Loader2, CheckCircle2, User, Info, Crown,
+} from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -20,17 +19,25 @@ import QuickApplyButton from '@/components/jobdetail/QuickApplyButton';
 import ApplicantsList from '@/components/jobdetail/ApplicantsList';
 import { useEscrow } from '@/hooks/useEscrow';
 
+const STATUS_STYLES = {
+  open:        'bg-primary/10 text-primary',
+  in_progress: 'bg-amber-100 text-amber-700',
+  completed:   'bg-green-100 text-green-700',
+};
+
 export default function JobDetail() {
   const jobId = new URLSearchParams(window.location.search).get('id') || window.location.pathname.split('/').pop();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
   const queryClient = useQueryClient();
-  const escrow = useEscrow();
-  const [proposal, setProposal] = useState('');
-  const [applyMode, setApplyMode] = useState('individual'); // 'individual' | 'pod'
-  const [podName, setPodName] = useState('');
-  const [podMembers, setPodMembers] = useState([]);
+  const escrow     = useEscrow();
 
+  const [proposal,    setProposal]    = useState('');
+  const [applyMode,   setApplyMode]   = useState('individual');
+  const [podName,     setPodName]     = useState('');
+  const [podMembers,  setPodMembers]  = useState([]);
+
+  /* ── Queries ─────────────────────────────────────────────────────────────── */
   const { data: job, isLoading: loadingJob } = useQuery({
     queryKey: ['job', jobId],
     queryFn: async () => {
@@ -59,43 +66,31 @@ export default function JobDetail() {
     enabled: !!user?.email,
   });
 
-  const isEmployer = job?.employer_email === user?.email;
+  /* ── Derived state ───────────────────────────────────────────────────────── */
+  const isEmployer       = job?.employer_email === user?.email;
   const isSelectedJobber = job?.selected_applicant_email === user?.email;
-  const sortedKpis = [...kpis].sort((a, b) => b.weight - a.weight);
-
-  // podMembers always includes admin at index 0 (managed by PodBuilder)
-  const podTotalShare = podMembers.reduce((sum, m) => sum + (Number(m.share) || 0), 0);
-  const podValid = applyMode === 'individual'
+  const sortedKpis       = [...kpis].sort((a, b) => b.weight - a.weight);
+  const podTotalShare    = podMembers.reduce((sum, m) => sum + (Number(m.share) || 0), 0);
+  const podValid         = applyMode === 'individual'
     || (podName.trim() && podMembers.length >= 2 && podMembers.length <= 5 && podTotalShare === 100);
 
+  /* ── Mutations ───────────────────────────────────────────────────────────── */
   const applyMutation = useMutation({
     mutationFn: async () => {
-      // Prevent duplicate applications from the same user
       const existingApps = await Application.filter({ job_id: jobId, applicant_email: user.email });
-      if (existingApps.length > 0) {
-        throw new Error('You already applied to this job.');
-      }
+      if (existingApps.length > 0) throw new Error('You already applied to this job.');
 
-      // Anti-spam guard
       const { allowed, reason } = await checkCanApply(user.email);
       if (!allowed) {
-        if (reason?.startsWith('cooldown:')) {
-          throw new Error(`Please wait ${reason.split(':')[1]}s before applying again.`);
-        } else if (reason === 'daily_limit') {
-          throw new Error('Daily application limit reached. Try again tomorrow.');
-        }
+        if (reason?.startsWith('cooldown:')) throw new Error(`Please wait ${reason.split(':')[1]}s before applying again.`);
+        else if (reason === 'daily_limit') throw new Error('Daily application limit reached. Try again tomorrow.');
         throw new Error('Cannot apply right now.');
       }
 
       const isPod = applyMode === 'pod';
-
-      // Collect performance snapshot for manual apply too
       let perfSnapshot = {};
       try {
-        const completedJobs = await Job.filter({
-          selected_applicant_email: user.email,
-          status: 'completed',
-        });
+        const completedJobs = await Job.filter({ selected_applicant_email: user.email, status: 'completed' });
         const kpiResults = completedJobs.length > 0
           ? await Promise.all(completedJobs.slice(0, 5).map(j => KPI.filter({ job_id: j.id })))
           : [];
@@ -135,33 +130,28 @@ export default function JobDetail() {
           : `@${user.username || user.full_name} applied to "${job.title}"`,
         job_id: jobId,
       });
-      recordApplicationTimestamp();
     },
     onSuccess: () => {
-      toast.success('Application submitted successfully!');
+      toast.success('Application submitted!');
       queryClient.invalidateQueries({ queryKey: ['my-application'] });
       queryClient.invalidateQueries({ queryKey: ['job-applications'] });
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },
-    onError: (err) => {
-      toast.error(err.message || 'Submission failed.');
-    },
+    onError: (err) => toast.error(err.message || 'Submission failed.'),
   });
 
   const selectMutation = useMutation({
     mutationFn: async (app) => {
-      // Look up jobber's saved wallet address so the relayer can pay them
       let jobberWallet = null;
       try {
         const jobberUsers = await UserEntity.filter({ email: app.applicant_email });
         jobberWallet = jobberUsers[0]?.wallet_address || null;
       } catch (_) {}
-
       await Job.update(jobId, {
         status: 'in_progress',
         selected_applicant_email: app.applicant_email,
         selected_applicant_username: app.applicant_username,
-        jobber_wallet: jobberWallet,  // relayer needs this to call release()
+        jobber_wallet: jobberWallet,
       });
       await Application.update(app.id, { status: 'accepted' });
       await Notification.create({
@@ -190,62 +180,86 @@ export default function JobDetail() {
       }
     },
     onSuccess: () => {
-      toast.success('Escrow funded successfully! Job is now visible.');
+      toast.success('Escrow funded! Job is now visible.');
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },
-    onError: (err) => {
-      toast.error(`Funding failed: ${err.message}`);
-    },
+    onError: (err) => toast.error(`Funding failed: ${err.message}`),
   });
 
   const deleteJobMutation = useMutation({
     mutationFn: async () => {
       await fetch(`/api/jobs/cleanup-unfunded/${jobId}`, { method: 'DELETE' });
     },
-    onSuccess: () => {
-      toast.success('Job deleted.');
-      navigate('/'); // Go back to dashboard
-    },
-    onError: (err) => {
-      toast.error(`Delete failed: ${err.message}`);
-    },
+    onSuccess: () => { toast.success('Job deleted.'); navigate('/'); },
+    onError:   (err) => toast.error(`Delete failed: ${err.message}`),
   });
 
+  /* ── Loading / not found ─────────────────────────────────────────────────── */
   if (loadingJob) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-48 w-full" /></div>;
-  }
-
-  if (!job) {
-    return <div className="text-center py-20 text-muted-foreground">Job not found</div>;
-  }
-
-  // If job is in_progress and user is employer or selected jobber, redirect to active view
-  if ((job.status === 'in_progress' || job.status === 'completed') && (isEmployer || isSelectedJobber)) {
     return (
-      <div className="text-center py-12">
-        <CheckCircle2 className="w-12 h-12 text-accent mx-auto mb-4" />
-        <p className="text-foreground mb-4">This job is active</p>
-        <Button onClick={() => navigate(`/active-job/${jobId}`)} className="bg-primary text-primary-foreground">
-          Go to Active Job Board
-        </Button>
+      <div className="max-w-3xl mx-auto space-y-4 pb-8">
+        <Skeleton className="h-6 w-24 rounded-lg" />
+        <Skeleton className="h-10 w-3/4 rounded-lg" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
     );
   }
 
+  if (!job) {
+    return (
+      <div className="text-center py-20 text-muted-foreground text-sm">Job not found.</div>
+    );
+  }
+
+  if ((job.status === 'in_progress' || job.status === 'completed') && (isEmployer || isSelectedJobber)) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <CheckCircle2 className="w-7 h-7 text-primary" />
+        </div>
+        <p className="text-foreground font-medium">This job is active</p>
+        <button
+          onClick={() => navigate(`/active-job/${jobId}`)}
+          className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Go to Active Job Board
+        </button>
+      </div>
+    );
+  }
+
+  /* ── Render ──────────────────────────────────────────────────────────────── */
   return (
     <div className="max-w-3xl mx-auto pb-20 lg:pb-8 space-y-6">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2 text-muted-foreground">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </Button>
 
-      {/* Job Header */}
-      <div>
-        <Badge variant="outline" className="mb-2">{job.category}</Badge>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">{job.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">Posted by @{job.employer_username}</p>
-        <div className="flex flex-wrap items-center gap-4 mt-4">
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <DollarSign className="w-4 h-4" />
+      {/* Back */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
+
+      {/* Header */}
+      <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-secondary text-muted-foreground capitalize">
+                {job.category}
+              </span>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[job.status] || 'bg-secondary text-muted-foreground'}`}>
+                {job.status?.replace('_', ' ')}
+              </span>
+            </div>
+            <h1 className="text-xl font-semibold text-foreground leading-snug">{job.title}</h1>
+            <p className="text-sm text-muted-foreground mt-1">Posted by @{job.employer_username}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
+          <div className="flex items-center gap-1.5 text-sm">
+            <DollarSign className="w-4 h-4 text-muted-foreground" />
             <span className="font-semibold text-foreground">${job.payment_amount}</span>
           </div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -261,9 +275,11 @@ export default function JobDetail() {
 
       {/* KPIs */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Performance KPIs</h2>
+        <h2 className="text-base font-semibold text-foreground mb-3">Performance KPIs</h2>
         {loadingKpis ? (
-          <div className="space-y-3">{Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+          <div className="space-y-3">
+            {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+          </div>
         ) : (
           <div className="space-y-3">
             {sortedKpis.map(kpi => <KPICard key={kpi.id} kpi={kpi} />)}
@@ -271,179 +287,177 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* Apply Section */}
+      {/* Already applied */}
+      {myApplication && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5">
+          <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+          <span className="text-sm text-foreground">
+            You've applied to this job —{' '}
+            <span className="text-muted-foreground capitalize">{myApplication.status}</span>
+          </span>
+        </div>
+      )}
+
+      {/* Apply section */}
       {!isEmployer && job.status === 'open' && !myApplication && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Apply for this Job</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {/* Apply type toggle */}
-            <div className="flex rounded-lg overflow-hidden border border-border bg-secondary/30 p-0.5 gap-0.5">
-              {[
-                { key: 'individual', label: 'Individual', icon: User },
-                { key: 'pod', label: 'Pod', icon: Users },
-              ].map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setApplyMode(key)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
-                    applyMode === key
-                      ? 'bg-primary text-primary-foreground shadow'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" /> {label}
-                </button>
-              ))}
-            </div>
+        <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
+          <h2 className="text-base font-semibold text-foreground">Apply for this job</h2>
 
-            {/* Quick Apply — individual only */}
-            {applyMode === 'individual' && (
-              <>
-                <QuickApplyButton
-                  user={user}
-                  job={job}
-                  jobId={jobId}
-                  onApplied={() => {}}
-                />
-                <div className="flex items-center gap-2">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs text-muted-foreground">or apply manually</span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-              </>
-            )}
+          {/* Apply type toggle */}
+          <div className="flex rounded-xl overflow-hidden border border-border bg-secondary/30 p-0.5 gap-0.5">
+            {[
+              { key: 'individual', label: 'Individual', icon: User },
+              { key: 'pod',        label: 'Pod',        icon: Users },
+            ].map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setApplyMode(key)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  applyMode === key
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
 
-            {/* Pod Builder */}
-            {applyMode === 'pod' && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-xs text-muted-foreground mb-3">Build your pod — min 2, max 5 members. Reward split must total 100%.</p>
-                <PodBuilder
-                  currentUser={user}
-                  podName={podName}
-                  setPodName={setPodName}
-                  members={podMembers}
-                  setMembers={setPodMembers}
-                />
+          {/* Quick apply (individual) */}
+          {applyMode === 'individual' && (
+            <>
+              <QuickApplyButton user={user} job={job} jobId={jobId} onApplied={() => {}} />
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or write a proposal</span>
+                <div className="h-px flex-1 bg-border" />
               </div>
-            )}
+            </>
+          )}
 
-            {/* Manual proposal */}
-            <ProposalHelper jobTitle={job.title} onInsert={(text) => setProposal(text)} />
-            <div>
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Your Proposal</span>
-                <span className="text-xs text-muted-foreground">— explain how you'll achieve the KPIs above</span>
-              </div>
-              <Textarea
-                placeholder="Describe your approach and why you're a great fit for this job..."
-                value={proposal}
-                onChange={(e) => setProposal(e.target.value)}
-                className="bg-card border-border min-h-[120px]"
+          {/* Pod builder */}
+          {applyMode === 'pod' && (
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="text-xs text-muted-foreground mb-3">
+                Build your pod — min 2, max 5 members. Reward split must total 100%.
+              </p>
+              <PodBuilder
+                currentUser={user}
+                podName={podName}
+                setPodName={setPodName}
+                members={podMembers}
+                setMembers={setPodMembers}
               />
-              {proposal.trim().length > 0 && proposal.trim().length < 30 && (
-                <p className="text-xs text-chart-3 mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> Add more detail to strengthen your proposal.
-                </p>
-              )}
             </div>
+          )}
 
-            {/* Pod Summary */}
-            {applyMode === 'pod' && podMembers.length >= 2 && podTotalShare === 100 && podName.trim() && (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-2">
-                <p className="text-xs font-semibold text-accent uppercase tracking-wider">Pod Summary</p>
-                <p className="text-sm font-medium text-foreground">{podName}</p>
-                <div className="space-y-1.5">
-                  {podMembers.map((m, i) => (
-                    <div key={m.username} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        {i === 0 && <Crown className="w-3 h-3 text-primary" />}
-                        <span className="text-foreground">@{m.username}</span>
-                        {i === 0 && <span className="text-xs text-muted-foreground">(Admin)</span>}
-                      </div>
-                      <span className="font-mono text-xs text-muted-foreground">{m.share}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {applyMode === 'pod' && !podValid && (
-              <p className="text-xs text-chart-3 flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                {!podName.trim() ? 'Enter a pod name.' : podMembers.length < 2 ? 'Add at least 1 more member (min 2 total).' : podTotalShare !== 100 ? `Reward split is ${podTotalShare}% — must equal 100%.` : ''}
+          {/* Proposal helper + textarea */}
+          <ProposalHelper jobTitle={job.title} onInsert={(text) => setProposal(text)} />
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Your proposal — explain how you'll achieve the KPIs above
+            </label>
+            <Textarea
+              placeholder="Describe your approach and why you're a great fit…"
+              value={proposal}
+              onChange={(e) => setProposal(e.target.value)}
+              className="bg-background border-border min-h-[120px] resize-none"
+            />
+            {proposal.trim().length > 0 && proposal.trim().length < 30 && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <Info className="w-3 h-3" /> Add more detail to strengthen your proposal.
               </p>
             )}
+          </div>
 
-            <Button
-              onClick={() => applyMutation.mutate()}
-              disabled={!proposal.trim() || applyMutation.isPending || !podValid}
-              className="bg-primary text-primary-foreground gap-2 w-full transition-all active:scale-95"
-            >
-              {applyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              {applyMutation.isPending ? 'Submitting...' : applyMode === 'pod' ? 'Submit Pod Application' : 'Submit Application'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          {/* Pod summary */}
+          {applyMode === 'pod' && podMembers.length >= 2 && podTotalShare === 100 && podName.trim() && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider">Pod Summary</p>
+              <p className="text-sm font-medium text-foreground">{podName}</p>
+              <div className="space-y-1.5">
+                {podMembers.map((m, i) => (
+                  <div key={m.username} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      {i === 0 && <Crown className="w-3 h-3 text-primary" />}
+                      <span className="text-foreground">@{m.username}</span>
+                      {i === 0 && <span className="text-xs text-muted-foreground">(Admin)</span>}
+                    </div>
+                    <span className="font-mono text-xs text-muted-foreground">{m.share}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {myApplication && (
-        <Card className="border-accent/20 bg-accent/5">
-          <CardContent className="p-5 flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-accent" />
-            <span className="text-sm text-foreground">You've applied to this job ({myApplication.status})</span>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Employer: Escrow Error Handling */}
-      {isEmployer && !job.escrow_funded && job.escrow_error && (
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-destructive flex items-center gap-2">
-              <Info className="w-4 h-4" />
-              Escrow Funding Failed
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This job was created but escrow funding failed. The job is not visible to jobbers until funded.
+          {applyMode === 'pod' && !podValid && (
+            <p className="text-xs text-amber-600 flex items-center gap-1">
+              <Info className="w-3 h-3" />
+              {!podName.trim()
+                ? 'Enter a pod name.'
+                : podMembers.length < 2
+                ? 'Add at least 1 more member (min 2 total).'
+                : `Reward split is ${podTotalShare}% — must equal 100%.`}
             </p>
-            <div className="bg-destructive/10 rounded-lg p-3">
-              <p className="text-xs font-mono text-destructive">{job.escrow_error}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => retryFundingMutation.mutate()}
-                disabled={retryFundingMutation.isPending}
-                className="bg-primary text-primary-foreground gap-2"
-              >
-                {retryFundingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-                {retryFundingMutation.isPending ? 'Funding...' : 'Retry Funding'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (confirm('Are you sure you want to delete this unfunded job?')) {
-                    deleteJobMutation.mutate();
-                  }
-                }}
-                disabled={deleteJobMutation.isPending}
-                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground gap-2"
-              >
-                {deleteJobMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Delete Job
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          )}
+
+          <button
+            onClick={() => applyMutation.mutate()}
+            disabled={!proposal.trim() || applyMutation.isPending || !podValid}
+            className="w-full h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {applyMutation.isPending
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+              : <><Send className="w-4 h-4" /> {applyMode === 'pod' ? 'Submit Pod Application' : 'Submit Application'}</>
+            }
+          </button>
+        </div>
       )}
 
-      {/* Employer: View Applicants */}
+      {/* Employer — escrow error */}
+      {isEmployer && !job.escrow_funded && job.escrow_error && (
+        <div className="bg-card rounded-2xl border border-destructive/20 p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-destructive" />
+            <h2 className="text-base font-semibold text-destructive">Escrow funding failed</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This job was created but escrow funding failed. It won't be visible to jobbers until funded.
+          </p>
+          <div className="bg-destructive/8 rounded-xl p-3">
+            <p className="text-xs font-mono text-destructive">{job.escrow_error}</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => retryFundingMutation.mutate()}
+              disabled={retryFundingMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+            >
+              {retryFundingMutation.isPending
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Funding…</>
+                : <><DollarSign className="w-4 h-4" /> Retry Funding</>
+              }
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Delete this unfunded job?')) deleteJobMutation.mutate();
+              }}
+              disabled={deleteJobMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-destructive text-destructive text-sm font-medium hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-60"
+            >
+              {deleteJobMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Delete Job
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Employer — applicants */}
       {isEmployer && job.status === 'open' && job.escrow_funded && (
         <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Applicants ({applications.length})</h2>
+          <h2 className="text-base font-semibold text-foreground mb-3">
+            Applicants ({applications.length})
+          </h2>
           <ApplicantsList
             applications={applications}
             onSelect={(app) => selectMutation.mutate(app)}
