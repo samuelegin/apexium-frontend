@@ -67,7 +67,7 @@ export default function WalletButton({ compact = false }) {
                   onClick={openChainModal}
                   className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium
                              bg-secondary border border-border text-muted-foreground
-                             hover:text-foreground transition-colors w-full"
+                             hover:text-foreground transition-colors"
                 >
                   {chain?.hasIcon && chain.iconUrl && (
                     <img src={chain.iconUrl} alt={chain.name} className="w-3.5 h-3.5 rounded-full" />
@@ -84,7 +84,7 @@ export default function WalletButton({ compact = false }) {
                 onClick={openAccountModal}
                 className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                            bg-card border border-border text-foreground
-                           hover:bg-secondary transition-colors w-full"
+                           hover:bg-secondary transition-colors"
               >
                 {account.ensAvatar
                   ? <img src={account.ensAvatar} alt="avatar" className="w-5 h-5 rounded-full" />
