@@ -61,13 +61,13 @@ export default function WalletButton({ compact = false }) {
           }
 
           return (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2">
               {!compact && (
                 <button
                   onClick={openChainModal}
                   className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium
                              bg-secondary border border-border text-muted-foreground
-                             hover:text-foreground transition-colors w-full sm:w-auto"
+                             hover:text-foreground transition-colors w-full"
                 >
                   {chain?.hasIcon && chain.iconUrl && (
                     <img src={chain.iconUrl} alt={chain.name} className="w-3.5 h-3.5 rounded-full" />
@@ -84,7 +84,7 @@ export default function WalletButton({ compact = false }) {
                 onClick={openAccountModal}
                 className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                            bg-card border border-border text-foreground
-                           hover:bg-secondary transition-colors w-full sm:w-auto"
+                           hover:bg-secondary transition-colors w-full"
               >
                 {account.ensAvatar
                   ? <img src={account.ensAvatar} alt="avatar" className="w-5 h-5 rounded-full" />
