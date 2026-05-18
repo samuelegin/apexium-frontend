@@ -5,13 +5,14 @@ import { Send, ArrowLeft, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChatMessage, Job } from '@/api/entities';
 
 export default function Chat() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const params = new URLSearchParams(window.location.search);
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
   const selectedJobId = params.get('jobId');
   const [message, setMessage] = useState('');
   const scrollRef = useRef(null);
