@@ -143,7 +143,6 @@ export default function AppLayout() {
             }`}>
               {isEmployer ? 'EMPLOYER' : 'JOBBER'}
             </span>
-            <WalletButton compact />
             <Link to="/notifications" className="relative p-2">
               <Bell className="w-5 h-5 text-muted-foreground" />
               {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />}

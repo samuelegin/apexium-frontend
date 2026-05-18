@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import JobCard from '@/components/shared/JobCard';
 import PIScoreGauge from '@/components/shared/PIScoreGauge';
+import WalletButton from '@/components/wallet/WalletButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import XPBadge, { getProgress, getNextThreshold } from '@/components/growth/XPBadge';
 import { Job } from '@/api/entities';
@@ -54,6 +55,9 @@ function EmployerDashboard({ user }) {
             Welcome{user?.username ? `, @${user.username}` : ''}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your jobs and track hired talent</p>
+          <div className="mt-4 lg:hidden">
+            <WalletButton compact />
+          </div>
         </div>
         <Link to="/post-job">
           <Button className="bg-primary text-primary-foreground gap-2">
@@ -126,7 +130,7 @@ function JobberDashboard({ user }) {
   return (
     <div className="space-y-8 pb-20 lg:pb-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+        <div className="w-full">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-accent border border-accent/30 bg-accent/10 px-2 py-0.5 rounded-full">Jobber Mode</span>
           </div>
@@ -134,8 +138,11 @@ function JobberDashboard({ user }) {
             Welcome{user?.username ? `, @${user.username}` : ''}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Track your work and grow your PI Score</p>
+          <div className="mt-4 lg:hidden">
+            <WalletButton compact />
+          </div>
         </div>
-        <Link to="/marketplace">
+        <Link to="/marketplace" className="self-start md:self-auto">
           <Button className="bg-accent text-accent-foreground gap-2">
             <Search className="w-4 h-4" /> Find Work
           </Button>
