@@ -94,19 +94,20 @@ export default function Profile() {
   const { data: employerCompletedJobs = [] } = useQuery({
     queryKey: ['employer-completed-jobs', user?.email],
     queryFn: () => Job.filter({ employer_email: user?.email, status: 'completed' }, '-created_date', 1000),
-    enabled: isEmployer && !!user?.email,
+    enabled: !!user?.email,
   });
 
   const xp            = user?.xp_total || 0;
   const progress      = getProgress(xp);
   const nextThreshold = getNextThreshold(xp);
 
-  const completedCount = isEmployer ? employerCompletedJobs.length : user?.total_jobs_completed || 0;
+  const completedCount = employerCompletedJobs.length || user?.total_jobs_completed || 0;
+  const hasPIScore     = Boolean(user?.average_pi_score);
   const performanceStats = isEmployer ? [
     { label: 'Posted jobs completed', value: completedCount },
   ] : [
     { label: 'Jobs completed', value: completedCount },
-    { label: 'Avg PI Score',   value: `${user?.average_pi_score || 0}%` },
+    { label: 'Avg PI Score',   value: hasPIScore ? `${user.average_pi_score}%` : '—' },
   ];
 
   return (
@@ -290,7 +291,7 @@ export default function Profile() {
         <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Performance</h2>
           <div className="flex justify-center">
-            {!isEmployer && <PIScoreGauge score={user?.average_pi_score || 0} size="md" />}
+            {!isEmployer && hasPIScore && <PIScoreGauge score={user?.average_pi_score || 0} size="md" />}
           </div>
           <div className="space-y-2.5 pt-1">
             {performanceStats.map(({ label, value }) => (
