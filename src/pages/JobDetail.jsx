@@ -163,7 +163,7 @@ export default function JobDetail() {
       });
     },
     onSuccess: () => {
-      toast.success('Jobber selected!');
+      toast.success('Talent selected!');
       queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['job-applications'] });
     },
@@ -414,7 +414,7 @@ export default function JobDetail() {
         </div>
       )}
 
-      {/* Employer — escrow error */}
+      {/* Project — escrow error */}
       {isEmployer && !job.escrow_funded && job.escrow_error && (
         <div className="bg-card rounded-2xl border border-destructive/20 p-6 space-y-4">
           <div className="flex items-center gap-2">
@@ -422,7 +422,7 @@ export default function JobDetail() {
             <h2 className="text-base font-semibold text-destructive">Escrow funding failed</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            This job was created but escrow funding failed. It won't be visible to jobbers until funded.
+            This job was created but escrow funding failed. It won't be visible to talents until funded.
           </p>
           <div className="bg-destructive/8 rounded-xl p-3">
             <p className="text-xs font-mono text-destructive">{job.escrow_error}</p>
@@ -452,7 +452,7 @@ export default function JobDetail() {
         </div>
       )}
 
-      {/* Employer — applicants */}
+      {/* Project — applicants */}
       {isEmployer && job.status === 'open' && job.escrow_funded && (
         <div>
           <h2 className="text-base font-semibold text-foreground mb-3">

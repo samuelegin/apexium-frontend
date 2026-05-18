@@ -140,8 +140,8 @@ export default function ActiveJob() {
             <DeadlineCountdown deadline={job.deadline} jobStatus={job.status} />
             <span className="text-xs text-muted-foreground">
               {isEmployer
-                ? `Jobber: @${job.selected_applicant_username}`
-                : `Employer: @${job.employer_username}`}
+                ? `Talent: @${job.selected_applicant_username}`
+                : `Project: @${job.employer_username}`}
             </span>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function ActiveJob() {
       {isOverdue && job.status !== 'completed' && (
         <Banner
           icon={XCircle}
-          message="This job has passed its deadline. New submissions are flagged. Coordinate with your employer to resolve."
+          message="This job has passed its deadline. New submissions are flagged. Coordinate with your project to resolve."
           variant="danger"
         />
       )}
@@ -168,7 +168,7 @@ export default function ActiveJob() {
       {/* Extension states */}
       {isEmployer && job.extension_requested && <ExtensionReviewCard job={job} />}
       {isJobber && job.extension_requested && job.extension_status === 'pending' && (
-        <Banner icon={Timer} message="Extension request pending employer review." variant="warn" />
+        <Banner icon={Timer} message="Extension request pending project review." variant="warn" />
       )}
       {isJobber && job.extension_status === 'approved' && (
         <Banner icon={CheckCircle2} message="Deadline extension approved." variant="success" />

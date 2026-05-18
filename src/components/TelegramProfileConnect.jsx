@@ -110,7 +110,7 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Connect your Telegram account so employers can reach you and see your Telegram username on job postings.
+              Connect your Telegram account so projects can reach you and see your Telegram username on job postings.
             </p>
             <Button
               onClick={handleConnectClick}

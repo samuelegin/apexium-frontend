@@ -168,8 +168,8 @@ export default function MyJobs() {
   const isLoading = le || lj || la;
 
   const tabs = [
-    { key: 'employer', label: 'As Employer', icon: Briefcase, count: employerJobs.length },
-    { key: 'jobber',   label: 'As Jobber',   icon: UserCheck,     count: jobberJobs.length },
+    { key: 'employer', label: 'As Project', icon: Briefcase, count: employerJobs.length },
+    { key: 'jobber',   label: 'As Talent',   icon: UserCheck,     count: jobberJobs.length },
     { key: 'applied',  label: 'Applied',     icon: ClipboardList, count: appliedJobs.length },
   ];
 

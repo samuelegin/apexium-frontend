@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { addHours, format } from 'date-fns';
 import { Job, Notification } from '@/api/entities';
 
-// JOBBER: submit an extension request
+// TALENT: submit an extension request
 export function ExtensionRequestDialog({ job, open, onClose }) {
   const queryClient = useQueryClient();
   const [hours, setHours] = useState('24');
@@ -49,7 +49,7 @@ export function ExtensionRequestDialog({ job, open, onClose }) {
             <Clock className="w-4 h-4 text-primary" /> Request Extension
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Ask your employer for more time to complete this job.
+            Ask your project for more time to complete this job.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-1">
@@ -93,7 +93,7 @@ export function ExtensionRequestDialog({ job, open, onClose }) {
   );
 }
 
-// EMPLOYER: review an extension request
+// PROJECT: review an extension request
 export function ExtensionReviewCard({ job }) {
   const queryClient = useQueryClient();
   const [customHours, setCustomHours] = useState(String(job.extension_hours || ''));
@@ -120,7 +120,7 @@ export function ExtensionReviewCard({ job }) {
           user_email: job.selected_applicant_email,
           type: 'proof_rejected',
           title: 'Extension Rejected',
-          message: 'Your deadline extension request was rejected by the employer.',
+          message: 'Your deadline extension request was rejected by the project.',
           job_id: job.id,
         });
       }

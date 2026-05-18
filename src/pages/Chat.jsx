@@ -99,8 +99,8 @@ export default function Chat() {
                     <p className="text-sm font-medium text-foreground truncate">{job.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {job.employer_email === user?.email
-                        ? `Jobber: @${job.selected_applicant_username}`
-                        : `Employer: @${job.employer_username}`}
+                        ? `Talent: @${job.selected_applicant_username}`
+                        : `Project: @${job.employer_username}`}
                     </p>
                   </div>
                 </div>

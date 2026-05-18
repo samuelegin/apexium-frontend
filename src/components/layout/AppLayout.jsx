@@ -162,7 +162,7 @@ export default function AppLayout() {
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
               isEmployer ? 'border-primary/40 bg-primary/10 text-primary' : 'border-accent/40 bg-accent/10 text-accent'
             }`}>
-              {isEmployer ? 'EMPLOYER' : 'JOBBER'}
+              {isEmployer ? 'PROJECT' : 'TALENT'}
             </span>
 
             {/* Theme toggle — icon only, no text */}

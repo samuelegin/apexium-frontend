@@ -26,7 +26,7 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
   const scoreGainIfApproved = kpi ? ((kpi.weight / 100) * (100 - (kpi.completion_percent || 0))) : 0;
   const newScore            = Math.min(100, currentScore + scoreGainIfApproved);
 
-  // Is this the last KPI? Warn the employer that approval triggers escrow release.
+  // Is this the last KPI? Warn the project that approval triggers escrow release.
   const isLastKpi = allKpis.length > 0 &&
     allKpis.filter(k => k.id !== kpi?.id).every(k => k.status === 'approved');
 
@@ -46,7 +46,7 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
 
       // ── Completion check: if all KPIs approved, mark job complete ──────────
       // The backend relayer listens for job.status → 'completed' and then calls
-      // escrow.release(jobId) on-chain to send USDC to the jobber.
+      // escrow.release(jobId) on-chain to send USDC to the talent.
       if (approved) {
         const allKpisData  = await KPI.filter({ job_id: job.id });
         const updatedKpis  = allKpisData.map(k => k.id === kpi.id ? { ...k, status: 'approved' } : k);
@@ -139,7 +139,7 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20">
               <TrendingUp className="w-4 h-4 text-accent shrink-0" />
               <p className="text-xs text-accent">
-                Approving increases the jobber's score by{' '}
+                Approving increases the talent's score by{' '}
                 <span className="font-bold">+{scoreGainIfApproved.toFixed(1)}%</span>
                 {' '}({currentScore.toFixed(1)}% → {newScore.toFixed(1)}%)
               </p>
@@ -154,7 +154,7 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
                 <p className="font-semibold">This is the final KPI</p>
                 <p className="text-primary/80">
                   Approving this will mark the job complete and trigger the escrow release —{' '}
-                  <span className="font-medium">${job?.payment_amount} USDC</span> will be sent to the jobber's wallet.
+                  <span className="font-medium">${job?.payment_amount} USDC</span> will be sent to the talent's wallet.
                 </p>
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
           )}
 
           <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1">
-            <ShieldCheck className="w-3 h-3" /> Your decision is recorded and visible to the jobber.
+            <ShieldCheck className="w-3 h-3" /> Your decision is recorded and visible to the talent.
           </p>
         </div>
       </DialogContent>

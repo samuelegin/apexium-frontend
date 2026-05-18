@@ -110,7 +110,7 @@ export default function DiscordProfileConnect({ discordId, discordUsername }) {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Connect your Discord account so employers can reach you and see your Discord username on job postings.
+              Connect your Discord account so projects can reach you and see your Discord username on job postings.
             </p>
             <Button
               onClick={handleConnectClick}

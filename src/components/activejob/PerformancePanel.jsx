@@ -27,7 +27,7 @@ function getInsight(kpis) {
     return { icon: CheckCircle2, color: 'text-accent', text: 'Great job completing your most impactful KPI.' };
   }
   if (hasSubmitted && !hasApproved) {
-    return { icon: Send, color: 'text-primary', text: 'Proof submitted. Awaiting employer verification.' };
+    return { icon: Send, color: 'text-primary', text: 'Proof submitted. Awaiting project verification.' };
   }
   if (hasApproved) {
     return { icon: TrendingUp, color: 'text-accent', text: 'Your score has increased based on approved work.' };

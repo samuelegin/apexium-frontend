@@ -69,7 +69,7 @@ export default function ModeSwitcher({ collapsed = false }) {
         >
           <Search className="w-4 h-4" />
           <div>
-            <div className="font-medium">Jobber Mode</div>
+            <div className="font-medium">Talent Mode</div>
             <div className="text-xs text-muted-foreground">Find & complete work</div>
           </div>
           {mode === 'jobber' && <span className="ml-auto text-chart-1 text-xs">●</span>}
@@ -80,7 +80,7 @@ export default function ModeSwitcher({ collapsed = false }) {
         >
           <Briefcase className="w-4 h-4" />
           <div>
-            <div className="font-medium">Employer Mode</div>
+            <div className="font-medium">Project Mode</div>
             <div className="text-xs text-muted-foreground">Post jobs & manage work</div>
           </div>
           {mode === 'employer' && <span className="ml-auto text-primary text-xs">●</span>}

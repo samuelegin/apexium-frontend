@@ -173,12 +173,12 @@ export default function Login() {
               {[
                 {
                   key: 'jobber',
-                  title: 'Jobber',
+                  title: 'Talent',
                   description: 'Apply for work, submit proof, earn on-chain.',
                 },
                 {
                   key: 'employer',
-                  title: 'Employer',
+                  title: 'Project',
                   description: 'Post jobs, set KPIs, review applicants.',
                 },
               ].map(option => (
@@ -247,7 +247,7 @@ export default function Login() {
               {cvUploading ? (
                 <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving…</>
               ) : (
-                `Continue as ${selectedRole === 'jobber' ? 'Jobber' : 'Employer'}`
+                `Continue as ${selectedRole === 'jobber' ? 'Talent' : 'Project'}`
               )}
             </Button>
           </DialogFooter>

@@ -194,7 +194,7 @@ export default function PostJob() {
             <div>
               <h2 className="text-base font-semibold text-foreground">Job details</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Give your job a clear title and category so the right jobbers can find it.
+                Give your job a clear title and category so the right talents can find it.
               </p>
             </div>
             <Field label="Job title">
@@ -226,7 +226,7 @@ export default function PostJob() {
             <div>
               <h2 className="text-base font-semibold text-foreground">Define KPIs</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Set clear, measurable outcomes. Jobbers are paid based on achieving these.
+                Set clear, measurable outcomes. Talents are paid based on achieving these.
               </p>
             </div>
             <KPIBuilder kpis={kpis} setKpis={setKpis} category={category} />
@@ -239,7 +239,7 @@ export default function PostJob() {
             <div>
               <h2 className="text-base font-semibold text-foreground">Set a deadline</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Choose a realistic deadline — jobbers see this before they apply.
+                Choose a realistic deadline — talents see this before they apply.
               </p>
             </div>
             <Field label="Deadline">
@@ -287,7 +287,7 @@ export default function PostJob() {
               <ul className="space-y-1.5 text-xs text-muted-foreground pl-6 list-disc">
                 <li>Your USDC is locked in the <span className="font-medium text-foreground">work3labs Escrow</span> contract on Base</li>
                 <li>Funds are only released when <span className="font-medium text-foreground">all KPIs are approved</span></li>
-                <li>You can cancel and reclaim funds before a jobber is selected</li>
+                <li>You can cancel and reclaim funds before a talent is selected</li>
               </ul>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-primary/10">
                 <Wallet className="w-3.5 h-3.5" />

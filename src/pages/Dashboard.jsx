@@ -49,7 +49,7 @@ function EmployerDashboard({ user }) {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-full">Employer Mode</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-full">Project Mode</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Welcome{user?.username ? `, @${user.username}` : ''}
@@ -132,7 +132,7 @@ function JobberDashboard({ user }) {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="w-full">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent border border-accent/30 bg-accent/10 px-2 py-0.5 rounded-full">Jobber Mode</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-accent border border-accent/30 bg-accent/10 px-2 py-0.5 rounded-full">Talent Mode</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Welcome{user?.username ? `, @${user.username}` : ''}

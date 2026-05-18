@@ -20,10 +20,10 @@ export default function EmployerPerformancePanel({ kpis, jobberUsername }) {
   const someIncomplete = kpis.some(k => k.status !== 'approved');
 
   const insight = primaryDone && !someIncomplete
-    ? { text: 'Jobber has completed all KPIs. Ready for final review.', icon: CheckCircle2, color: 'text-accent' }
+    ? { text: 'Talent has completed all KPIs. Ready for final review.', icon: CheckCircle2, color: 'text-accent' }
     : primaryDone
-    ? { text: `Jobber is performing strongly on the primary KPI. Some tasks remain incomplete.`, icon: TrendingUp, color: 'text-chart-3' }
-    : { text: `Primary KPI "${primaryKpi?.name}" is not yet complete. Jobber needs to prioritize this.`, icon: AlertTriangle, color: 'text-chart-3' };
+    ? { text: `Talent is performing strongly on the primary KPI. Some tasks remain incomplete.`, icon: TrendingUp, color: 'text-chart-3' }
+    : { text: `Primary KPI "${primaryKpi?.name}" is not yet complete. Talent needs to prioritize this.`, icon: AlertTriangle, color: 'text-chart-3' };
 
   const InsightIcon = insight.icon;
 
@@ -31,7 +31,7 @@ export default function EmployerPerformancePanel({ kpis, jobberUsername }) {
     <div className="space-y-4">
       {/* Header */}
       <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-        {jobberUsername ? `@${jobberUsername}'s Performance` : 'Jobber Performance'}
+        {jobberUsername ? `@${jobberUsername}'s Performance` : 'Talent Performance'}
       </div>
 
       {/* Gauge */}
