@@ -47,7 +47,7 @@ export default function KPIBuilder({ kpis, setKpis, category }) {
 
       {/* Weight Status Bar */}
       <div className={`p-3 rounded-lg border transition-all ${
-        weightOk ? 'border-accent/40 bg-accent/5' :
+        weightOk ? 'border-emerald-300/70 bg-emerald-50' :
         weightOver ? 'border-destructive/40 bg-destructive/5' :
         'border-chart-3/40 bg-chart-3/5'
       }`}>
@@ -55,16 +55,16 @@ export default function KPIBuilder({ kpis, setKpis, category }) {
           <span className="text-sm font-medium">Total Weight</span>
           <div className="flex items-center gap-2">
             <span className={`text-xl font-bold font-mono ${
-              weightOk ? 'text-accent' : weightOver ? 'text-destructive' : 'text-chart-3'
+              weightOk ? 'text-emerald-700' : weightOver ? 'text-destructive' : 'text-chart-3'
             }`}>{totalWeight}%</span>
             <span className="text-xs text-muted-foreground">/ 100%</span>
-            {weightOk && <CheckCircle2 className="w-4 h-4 text-accent" />}
+            {weightOk && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
           </div>
         </div>
         {/* Weight progress bar */}
         <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
           <motion.div
-            className={`h-full rounded-full ${weightOk ? 'bg-accent' : weightOver ? 'bg-destructive' : 'bg-chart-3'}`}
+            className={`h-full rounded-full ${weightOk ? 'bg-emerald-500' : weightOver ? 'bg-destructive' : 'bg-chart-3'}`}
             animate={{ width: `${Math.min(totalWeight, 100)}%` }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
           />
