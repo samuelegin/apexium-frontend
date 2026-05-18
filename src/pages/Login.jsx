@@ -125,7 +125,7 @@ export default function Login() {
             </div>
 
             {/* Heading */}
-            <div className="space-y-1">
+            <div className="space-y-1 text-center">
               <h2 className="text-2xl font-semibold text-foreground">Welcome back</h2>
               <p className="text-sm text-muted-foreground">Sign in to your account to continue</p>
             </div>
