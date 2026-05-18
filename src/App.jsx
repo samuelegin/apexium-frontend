@@ -2,34 +2,33 @@ import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import PageNotFound  from './lib/PageNotFound';
+import PageNotFound   from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ModeProvider } from '@/lib/ModeContext';
 import { ThemeProvider, useThemeMode } from '@/lib/ThemeContext';
-import AppLayout     from '@/components/layout/AppLayout';
-import Login         from '@/pages/Login';
-import Dashboard     from '@/pages/Dashboard.jsx';
-import Marketplace   from '@/pages/Marketplace';
-import PostJob       from '@/pages/PostJob';
-import JobDetail     from '@/pages/JobDetail';
-import ActiveJob     from '@/pages/ActiveJob.jsx';
-import MyJobs        from '@/pages/MyJobs';
-import Chat          from '@/pages/Chat';
-import Notifications from '@/pages/Notifications';
-import Profile       from '@/pages/Profile';
-import Tasks         from '@/pages/Tasks';
-import Referrals     from '@/pages/Referrals';
-import XPActivity    from '@/pages/XPActivity';
-import AdminPanel    from '@/pages/AdminPanel';
-import Pods          from '@/pages/Pods';
-import AuthCallback  from '@/pages/AuthCallback';
+import AppLayout      from '@/components/layout/AppLayout';
+import Login          from '@/pages/Login';
+import Dashboard      from '@/pages/Dashboard.jsx';
+import Marketplace    from '@/pages/Marketplace';
+import PostJob        from '@/pages/PostJob';
+import JobDetail      from '@/pages/JobDetail';
+import ActiveJob      from '@/pages/ActiveJob.jsx';
+import MyJobs         from '@/pages/MyJobs';
+import Chat           from '@/pages/Chat';
+import Notifications  from '@/pages/Notifications';
+import Profile        from '@/pages/Profile';
+import Tasks          from '@/pages/Tasks';
+import Referrals      from '@/pages/Referrals';
+import XPActivity     from '@/pages/XPActivity';
+import AdminPanel     from '@/pages/AdminPanel';
+import Pods           from '@/pages/Pods';
+import AuthCallback from '@/pages/AuthCallback';
 
 import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider, darkTheme, lightTheme } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
 import { wagmiConfig } from '@/lib/wagmi';
 
-/* ── Routes (inside all providers) ─────────────────────────────────────────── */
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -41,16 +40,11 @@ function AuthenticatedApp() {
     );
   }
 
-  const modeConfirmed =
-    user?.mode_confirmed === 1 ||
-    user?.mode_confirmed === '1' ||
-    user?.mode_confirmed === true;
-
-  if (!isAuthenticated || (user && !modeConfirmed)) {
+  if (!isAuthenticated || (user && !(user.mode_confirmed === 1 || user.mode_confirmed === '1' || user.mode_confirmed === true))) {
     return (
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="*"              element={<Login />} />
+        <Route path="*" element={<Login />} />
       </Routes>
     );
   }
@@ -59,10 +53,10 @@ function AuthenticatedApp() {
     <Routes>
       <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* Admin — full-screen, outside AppLayout */}
+      {/* ── Admin — completely outside AppLayout, its own full-screen layout ── */}
       <Route path="/admin" element={<AdminPanel />} />
 
-      {/* All other routes inside AppLayout */}
+      {/* ── All other routes inside AppLayout ─────────────────────────────── */}
       <Route element={<AppLayout />}>
         <Route path="/"               element={<Dashboard />} />
         <Route path="/marketplace"    element={<Marketplace />} />
@@ -77,52 +71,40 @@ function AuthenticatedApp() {
         <Route path="/referrals"      element={<Referrals />} />
         <Route path="/xp-activity"    element={<XPActivity />} />
         <Route path="/pods"           element={<Pods />} />
-        <Route path="*"              element={<PageNotFound />} />
+        <Route path="*"               element={<PageNotFound />} />
       </Route>
     </Routes>
   );
 }
 
-/* ── RainbowKit theme tied to ThemeContext ──────────────────────────────────── */
-function ThemedRainbowKit({ children }) {
+function ThemeAwareRainbowKit({ children }) {
   const { theme } = useThemeMode();
-  const accent = 'hsl(138 100% 55%)'; // brand green
 
   return (
     <RainbowKitProvider
-      theme={theme === 'dark'
-        ? darkTheme({
-            accentColor:           accent,
-            accentColorForeground: '#0d0d0d',
-            borderRadius:          'medium',
-            fontStack:             'system',
-          })
-        : lightTheme({
-            accentColor:           accent,
-            accentColorForeground: '#0d0d0d',
-            borderRadius:          'medium',
-            fontStack:             'system',
-          })
-      }
+      theme={theme === 'dark' ? darkTheme({
+        accentColor:           'hsl(var(--primary))',
+        accentColorForeground: 'hsl(var(--primary-foreground))',
+        borderRadius:          'medium',
+        fontStack:             'system',
+      }) : lightTheme({
+        accentColor:           'hsl(var(--primary))',
+        accentColorForeground: 'hsl(var(--primary-foreground))',
+        borderRadius:          'medium',
+        fontStack:             'system',
+      })}
     >
       {children}
     </RainbowKitProvider>
   );
 }
 
-/* ── Root ───────────────────────────────────────────────────────────────────── */
 export default function App() {
   return (
-    // ThemeProvider must be outermost so useThemeMode works everywhere
     <ThemeProvider>
-      {/*
-        CORRECT ORDER (wagmi docs requirement):
-        WagmiProvider → RainbowKitProvider → everything else
-        QueryClientProvider must be INSIDE WagmiProvider
-      */}
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClientInstance}>
-          <ThemedRainbowKit>
+      <ThemeAwareRainbowKit>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClientInstance}>
             <AuthProvider>
               <ModeProvider>
                 <Router>
@@ -131,9 +113,9 @@ export default function App() {
                 <Toaster />
               </ModeProvider>
             </AuthProvider>
-          </ThemedRainbowKit>
-        </QueryClientProvider>
-      </WagmiProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </ThemeAwareRainbowKit>
     </ThemeProvider>
   );
 }
