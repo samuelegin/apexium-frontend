@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const ThemeContext = createContext();
-const STORAGE_KEY = 'apexium_theme';
+const STORAGE_KEY = 'w3l_theme'; // renamed from apexium_theme
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return 'light'; // default light
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === 'light' || stored === 'dark') return stored;
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
