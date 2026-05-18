@@ -147,7 +147,12 @@ export default function AppLayout() {
               <Bell className="w-5 h-5 text-muted-foreground" />
               {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />}
             </Link>
-            <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2">
+            <button
+            type="button"
+            aria-label="Toggle mobile menu"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-3 rounded-xl touch-manipulation hover:bg-muted/10 transition-colors"
+          >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
