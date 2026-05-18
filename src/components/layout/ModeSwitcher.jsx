@@ -31,7 +31,8 @@ export default function ModeSwitcher({ collapsed = false }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium w-full
+          type="button"
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium w-full touch-manipulation cursor-pointer
             ${isEmployer
               ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
               : 'border-chart-1/40 bg-chart-1/10 text-chart-1 hover:bg-chart-1/15'
