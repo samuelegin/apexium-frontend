@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useMode } from '@/lib/ModeContext';
-import { LayoutDashboard, Briefcase, Search, MessageSquare, Bell, User, Menu, X, Plus, Flame, ChevronRight, Users, Shield } from 'lucide-react';
+import { useThemeMode } from '@/lib/ThemeContext';
+import { LayoutDashboard, Briefcase, Search, MessageSquare, Bell, User, Menu, X, Plus, Flame, ChevronRight, Users, Shield, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/api/entities';
@@ -20,6 +21,23 @@ const EMPLOYER_NAV = [
   { path: '/profile', icon: User, label: 'Profile' },
 ];
 
+function ThemeButton() {
+  const { theme, toggleTheme } = useThemeMode();
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="flex items-center justify-between w-full gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted/80"
+    >
+      <span>{isDark ? 'Dark mode' : 'Light mode'}</span>
+      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+}
+
 const JOBBER_NAV = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/marketplace', icon: Search, label: 'Marketplace' },
@@ -34,6 +52,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user, refetch } = useAuth();
+  const { theme, toggleTheme } = useThemeMode();
   const { mode, isEmployer } = useMode();
   const navItems = isEmployer ? EMPLOYER_NAV : JOBBER_NAV;
 
@@ -63,8 +82,9 @@ export default function AppLayout() {
           </Link>
         </div>
 
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-4 pb-2 space-y-3">
           <ModeSwitcher />
+          <ThemeButton />
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-hidden">
@@ -143,16 +163,25 @@ export default function AppLayout() {
             }`}>
               {isEmployer ? 'EMPLOYER' : 'JOBBER'}
             </span>
+            <button
+              type="button"
+              onClick={() => toggleTheme()}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/80 px-3 py-2 text-sm font-medium text-foreground touch-manipulation hover:bg-muted transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
             <Link to="/notifications" className="relative p-2">
               <Bell className="w-5 h-5 text-muted-foreground" />
               {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />}
             </Link>
             <button
-            type="button"
-            aria-label="Toggle mobile menu"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-3 rounded-xl touch-manipulation hover:bg-muted/10 transition-colors"
-          >
+              type="button"
+              aria-label="Toggle mobile menu"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="p-3 rounded-xl touch-manipulation hover:bg-muted/10 transition-colors"
+            >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
@@ -169,7 +198,10 @@ export default function AppLayout() {
             transition={{ duration: 0.15 }}
             className="lg:hidden fixed inset-0 z-30 bg-background/95 backdrop-blur-md pt-14"
           >
-            <div className="p-4"><ModeSwitcher /></div>
+            <div className="p-4 space-y-3">
+            <ModeSwitcher />
+            <ThemeButton />
+          </div>
             <nav className="px-4 space-y-1">
               {navItems.map(item => (
                 <Link

@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound   from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ModeProvider } from '@/lib/ModeContext';
+import { ThemeProvider, useThemeMode } from '@/lib/ThemeContext';
 import AppLayout      from '@/components/layout/AppLayout';
 import Login          from '@/pages/Login';
 import Dashboard      from '@/pages/Dashboard.jsx';
@@ -24,7 +25,7 @@ import Pods           from '@/pages/Pods';
 import AuthCallback from '@/pages/AuthCallback';
 
 import '@rainbow-me/rainbowkit/styles.css';
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider, darkTheme, lightTheme } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
 import { wagmiConfig } from '@/lib/wagmi';
 
@@ -77,27 +78,45 @@ function AuthenticatedApp() {
 }
 
 export default function App() {
+function ThemeAwareRainbowKit({ children }) {
+  const { theme } = useThemeMode();
+
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClientInstance}>
-        <RainbowKitProvider
-          theme={darkTheme({
-            accentColor:           'hsl(var(--primary))',
-            accentColorForeground: 'hsl(var(--primary-foreground))',
-            borderRadius:          'medium',
-            fontStack:             'system',
-          })}
-        >
-          <AuthProvider>
-            <ModeProvider>
-              <Router>
-                <AuthenticatedApp />
-              </Router>
-              <Toaster />
-            </ModeProvider>
-          </AuthProvider>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <RainbowKitProvider
+      theme={theme === 'dark' ? darkTheme({
+        accentColor:           'hsl(var(--primary))',
+        accentColorForeground: 'hsl(var(--primary-foreground))',
+        borderRadius:          'medium',
+        fontStack:             'system',
+      }) : lightTheme({
+        accentColor:           'hsl(var(--primary))',
+        accentColorForeground: 'hsl(var(--primary-foreground))',
+        borderRadius:          'medium',
+        fontStack:             'system',
+      })}
+    >
+      {children}
+    </RainbowKitProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemeAwareRainbowKit>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClientInstance}>
+            <AuthProvider>
+              <ModeProvider>
+                <Router>
+                  <AuthenticatedApp />
+                </Router>
+                <Toaster />
+              </ModeProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </ThemeAwareRainbowKit>
+    </ThemeProvider>
   );
 }
