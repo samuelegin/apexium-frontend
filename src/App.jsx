@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound   from './lib/PageNotFound';
+import ErrorBoundary  from '@/components/ErrorBoundary';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ModeProvider } from '@/lib/ModeContext';
 import { ThemeProvider, useThemeMode } from '@/lib/ThemeContext';
@@ -101,26 +102,23 @@ function ThemeAwareRainbowKit({ children }) {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      {/*
-        FIX: QueryClientProvider must wrap RainbowKitProvider.
-        Correct order per wagmi docs:
-        WagmiProvider → QueryClientProvider → RainbowKitProvider → everything else
-      */}
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClientInstance}>
-          <ThemeAwareRainbowKit>
-            <AuthProvider>
-              <ModeProvider>
-                <Router>
-                  <AuthenticatedApp />
-                </Router>
-                <Toaster />
-              </ModeProvider>
-            </AuthProvider>
-          </ThemeAwareRainbowKit>
-        </QueryClientProvider>
-      </WagmiProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClientInstance}>
+            <ThemeAwareRainbowKit>
+              <AuthProvider>
+                <ModeProvider>
+                  <Router>
+                    <AuthenticatedApp />
+                  </Router>
+                  <Toaster />
+                </ModeProvider>
+              </AuthProvider>
+            </ThemeAwareRainbowKit>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
