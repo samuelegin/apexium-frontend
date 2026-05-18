@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useThemeMode } from '@/lib/ThemeContext';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   User, Camera, Save, Loader2, LogOut,
-  AtSign, Zap, AlertTriangle, Paperclip,
+  AtSign, Zap, AlertTriangle, Paperclip, Moon, Sun,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -97,6 +98,7 @@ export default function Profile() {
     enabled: !!user?.email,
   });
 
+  const { theme, toggleTheme } = useThemeMode();
   const xp            = user?.xp_total || 0;
   const progress      = getProgress(xp);
   const nextThreshold = getNextThreshold(xp);
@@ -112,7 +114,17 @@ export default function Profile() {
 
   return (
     <div className="max-w-2xl mx-auto pb-20 lg:pb-8 space-y-6">
-      <h1 className="text-2xl font-semibold text-foreground">Profile</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-foreground">Profile</h1>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="inline-flex items-center gap-2 rounded-2xl border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/90 transition-colors"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </button>
+      </div>
 
       {/* Identity card */}
       <div className="bg-card rounded-2xl border border-border p-6">
