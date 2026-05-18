@@ -108,6 +108,9 @@ export default function AppLayout() {
             </Link>
           </div>
         )}
+        <div className="px-4 pb-3">
+          <WalletButton />
+        </div>
         <div className="p-4 border-t border-border">
           {isEmployer ? (
             <Link to="/post-job">
