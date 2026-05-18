@@ -52,7 +52,7 @@ export default function ModeSwitcher({ collapsed = false }) {
                 : <Search className="w-4 h-4 shrink-0" />
               }
               {!collapsed && (
-                <span className="truncate">{isEmployer ? 'Employer' : 'Jobber'}</span>
+                <span className="truncate">{isEmployer ? 'Project' : 'Talent'}</span>
               )}
             </motion.div>
           </AnimatePresence>
