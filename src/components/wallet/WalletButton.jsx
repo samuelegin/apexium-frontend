@@ -16,8 +16,8 @@ function WalletSyncer() {
 
   useEffect(() => {
     if (!isConnected || !address || !user) return;
-    if (lastSaved.current === address) return;          // already saved this session
-    if (user.wallet_address === address) return;        // already in DB
+    if (lastSaved.current === address) return;
+    if (user.wallet_address === address) return;
     lastSaved.current = address;
     updateProfile({ wallet_address: address }).catch(() => {});
   }, [isConnected, address, user]);
@@ -37,7 +37,7 @@ export default function WalletButton({ compact = false }) {
             return (
               <button
                 onClick={openConnectModal}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
                            bg-primary/10 border border-primary/30 text-primary
                            hover:bg-primary/20 transition-colors"
               >
@@ -51,7 +51,7 @@ export default function WalletButton({ compact = false }) {
             return (
               <button
                 onClick={openChainModal}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
                            bg-destructive/10 border border-destructive/30 text-destructive
                            hover:bg-destructive/20 transition-colors"
               >
@@ -63,11 +63,11 @@ export default function WalletButton({ compact = false }) {
           const accountLabel = account.ensName ?? account.displayName;
 
           return (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 w-full">
               {!compact && (
                 <button
                   onClick={openChainModal}
-                  className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium
                              bg-secondary border border-border text-muted-foreground
                              hover:text-foreground transition-colors"
                 >
@@ -84,21 +84,21 @@ export default function WalletButton({ compact = false }) {
               )}
               <button
                 onClick={openAccountModal}
-                className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                            bg-card border border-border text-foreground
-                           hover:bg-secondary transition-colors min-w-0 max-w-[8rem]"
+                           hover:bg-secondary transition-colors"
               >
                 {account.ensAvatar
-                  ? <img src={account.ensAvatar} alt="avatar" className="w-5 h-5 rounded-full" />
-                  : <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                  ? <img src={account.ensAvatar} alt="avatar" className="w-5 h-5 rounded-full shrink-0" />
+                  : <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                       <Wallet className="w-3 h-3 text-primary" />
                     </div>
                 }
-                <span className={`font-mono text-xs truncate ${compact ? 'max-w-[5rem]' : ''}`}>
+                <span className="font-mono text-xs truncate">
                   {accountLabel}
                 </span>
                 {!compact && account.displayBalance && (
-                  <span className="text-xs text-muted-foreground">{account.displayBalance}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{account.displayBalance}</span>
                 )}
               </button>
             </div>
