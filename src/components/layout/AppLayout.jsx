@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useMode } from '@/lib/ModeContext';
 import { useThemeMode } from '@/lib/ThemeContext';
-import { LayoutDashboard, Briefcase, Search, MessageSquare, Bell, User, Menu, X, Plus, Flame, ChevronRight, Users, Shield, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Search, MessageSquare, Bell, User, Menu, X, Plus, ChevronRight, Users, Shield, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/api/entities';
@@ -24,7 +24,6 @@ const EMPLOYER_NAV = [
 function ThemeButton() {
   const { theme, toggleTheme } = useThemeMode();
   const isDark = theme === 'dark';
-
   return (
     <button
       type="button"
@@ -157,32 +156,33 @@ export default function AppLayout() {
             </div>
             <span className="font-bold text-foreground">Work3Labs</span>
           </Link>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1">
+            {/* Mode pill */}
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
               isEmployer ? 'border-primary/40 bg-primary/10 text-primary' : 'border-accent/40 bg-accent/10 text-accent'
             }`}>
               {isEmployer ? 'EMPLOYER' : 'JOBBER'}
             </span>
+
+            {/* Theme toggle — icon only, no text */}
             <button
               type="button"
               onClick={() => toggleTheme()}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/80 px-3 py-2 text-sm font-medium text-foreground touch-manipulation hover:bg-muted transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-xl touch-manipulation hover:bg-muted/60 transition-colors"
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </button>
-            <Link to="/notifications" className="relative p-2">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />}
-            </Link>
+
+            {/* Hamburger — larger tap target, bigger icon */}
             <button
               type="button"
               aria-label="Toggle mobile menu"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="p-3 rounded-xl touch-manipulation hover:bg-muted/10 transition-colors"
+              className="w-11 h-11 flex items-center justify-center rounded-xl touch-manipulation hover:bg-muted/60 transition-colors"
             >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
@@ -199,9 +199,9 @@ export default function AppLayout() {
             className="lg:hidden fixed inset-0 z-30 bg-background/95 backdrop-blur-md pt-14"
           >
             <div className="p-4 space-y-3">
-            <ModeSwitcher />
-            <ThemeButton />
-          </div>
+              <ModeSwitcher />
+              <ThemeButton />
+            </div>
             <nav className="px-4 space-y-1">
               {navItems.map(item => (
                 <Link
