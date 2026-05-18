@@ -22,7 +22,7 @@ import Referrals      from '@/pages/Referrals';
 import XPActivity     from '@/pages/XPActivity';
 import AdminPanel     from '@/pages/AdminPanel';
 import Pods           from '@/pages/Pods';
-import AuthCallback from '@/pages/AuthCallback';
+import AuthCallback   from '@/pages/AuthCallback';
 
 import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider, darkTheme, lightTheme } from '@rainbow-me/rainbowkit';
@@ -102,9 +102,14 @@ function ThemeAwareRainbowKit({ children }) {
 export default function App() {
   return (
     <ThemeProvider>
-      <ThemeAwareRainbowKit>
-        <WagmiProvider config={wagmiConfig}>
-          <QueryClientProvider client={queryClientInstance}>
+      {/*
+        FIX: QueryClientProvider must wrap RainbowKitProvider.
+        Correct order per wagmi docs:
+        WagmiProvider → QueryClientProvider → RainbowKitProvider → everything else
+      */}
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClientInstance}>
+          <ThemeAwareRainbowKit>
             <AuthProvider>
               <ModeProvider>
                 <Router>
@@ -113,9 +118,9 @@ export default function App() {
                 <Toaster />
               </ModeProvider>
             </AuthProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
-      </ThemeAwareRainbowKit>
+          </ThemeAwareRainbowKit>
+        </QueryClientProvider>
+      </WagmiProvider>
     </ThemeProvider>
   );
 }
