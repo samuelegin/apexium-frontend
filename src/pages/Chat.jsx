@@ -114,7 +114,7 @@ export default function Chat() {
 
   /* ── Chat view ───────────────────────────────────────────────────────────── */
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] lg:h-[calc(100vh-2rem)]">
+    <div className="flex flex-col h-[calc(100vh-7rem)] lg:h-[calc(100vh-2rem)] pb-14">
 
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b border-border shrink-0">
