@@ -77,7 +77,6 @@ function AuthenticatedApp() {
   );
 }
 
-export default function App() {
 function ThemeAwareRainbowKit({ children }) {
   const { theme } = useThemeMode();
 
