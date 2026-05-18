@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   User, Camera, Save, Loader2, LogOut,
   AtSign, Zap, AlertTriangle, Paperclip,
@@ -15,6 +15,7 @@ import XPBadge, { getProgress, getNextThreshold } from '@/components/growth/XPBa
 import TelegramProfileConnect from '@/components/TelegramProfileConnect';
 import DiscordProfileConnect from '@/components/DiscordProfileConnect';
 import auth from '@/api/authApi';
+import { Job } from '@/api/entities';
 
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth();
@@ -89,9 +90,24 @@ export default function Profile() {
     }
   };
 
+  const isEmployer    = user?.role === 'employer';
+  const { data: employerCompletedJobs = [] } = useQuery({
+    queryKey: ['employer-completed-jobs', user?.email],
+    queryFn: () => Job.filter({ employer_email: user?.email, status: 'completed' }, '-created_date', 1000),
+    enabled: isEmployer && !!user?.email,
+  });
+
   const xp            = user?.xp_total || 0;
   const progress      = getProgress(xp);
   const nextThreshold = getNextThreshold(xp);
+
+  const completedCount = isEmployer ? employerCompletedJobs.length : user?.total_jobs_completed || 0;
+  const performanceStats = isEmployer ? [
+    { label: 'Posted jobs completed', value: completedCount },
+  ] : [
+    { label: 'Jobs completed', value: completedCount },
+    { label: 'Avg PI Score',   value: `${user?.average_pi_score || 0}%` },
+  ];
 
   return (
     <div className="max-w-2xl mx-auto pb-20 lg:pb-8 space-y-6">
@@ -274,13 +290,10 @@ export default function Profile() {
         <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Performance</h2>
           <div className="flex justify-center">
-            <PIScoreGauge score={user?.average_pi_score || 0} size="md" />
+            {!isEmployer && <PIScoreGauge score={user?.average_pi_score || 0} size="md" />}
           </div>
           <div className="space-y-2.5 pt-1">
-            {[
-              { label: 'Jobs completed', value: user?.total_jobs_completed || 0 },
-              { label: 'Avg PI Score',   value: `${user?.average_pi_score || 0}%` },
-            ].map(({ label, value }) => (
+            {performanceStats.map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
                 <span className="font-mono font-semibold text-foreground">{value}</span>
