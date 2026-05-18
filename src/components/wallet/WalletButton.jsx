@@ -60,6 +60,8 @@ export default function WalletButton({ compact = false }) {
             );
           }
 
+          const accountLabel = account.ensName ?? account.displayName;
+
           return (
             <div className="flex flex-col gap-2">
               {!compact && (
@@ -84,7 +86,7 @@ export default function WalletButton({ compact = false }) {
                 onClick={openAccountModal}
                 className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                            bg-card border border-border text-foreground
-                           hover:bg-secondary transition-colors"
+                           hover:bg-secondary transition-colors min-w-0"
               >
                 {account.ensAvatar
                   ? <img src={account.ensAvatar} alt="avatar" className="w-5 h-5 rounded-full" />
@@ -92,8 +94,8 @@ export default function WalletButton({ compact = false }) {
                       <Wallet className="w-3 h-3 text-primary" />
                     </div>
                 }
-                <span className="font-mono text-xs">
-                  {account.ensName ?? account.displayName}
+                <span className={`font-mono text-xs ${compact ? 'max-w-[6rem] overflow-hidden truncate' : ''}`}>
+                  {accountLabel}
                 </span>
                 {!compact && account.displayBalance && (
                   <span className="text-xs text-muted-foreground">{account.displayBalance}</span>
