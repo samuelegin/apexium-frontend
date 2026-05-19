@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import auth from '@/api/authApi';
 import { toast } from 'sonner';
 import { MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [processingCallback, setProcessingCallback] = useState(false);
   const [savedUsername, setSavedUsername] = useState(null);
 
@@ -63,6 +65,21 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
     window.location.href = `${TELEGRAM_WIDGET_HOST}/auth/telegram?origin=${encodeURIComponent(window.location.origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
   };
 
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      await auth.disconnectTelegram();
+      setSavedUsername(null);
+      await refetch();
+      toast.success('Telegram disconnected');
+    } catch (err) {
+      console.error('[telegramConnect] disconnect error:', err);
+      toast.error('Failed to disconnect Telegram');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   // Use savedUsername if just connected, otherwise use props
   const displayUsername = savedUsername || telegramUsername;
   const isConnected = Boolean(telegramId || displayUsername);
@@ -90,22 +107,33 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
       </CardHeader>
       <CardContent>
         {isConnected ? (
-          <div className="flex items-center justify-between p-3 rounded-lg bg-accent/5 border border-accent/20">
+          <div className="flex flex-col gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-accent" />
               <span className="text-sm text-foreground">
                 Connected as <span className="font-semibold">@{displayUsername}</span>
               </span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleConnectClick}
-              disabled={connecting}
-              className="text-xs"
-            >
-              {connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Change'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleConnectClick}
+                disabled={connecting || disconnecting}
+                className="text-xs"
+              >
+                {connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Change'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleDisconnect}
+                disabled={disconnecting || connecting}
+                className="text-xs text-destructive"
+              >
+                {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Disconnect'}
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

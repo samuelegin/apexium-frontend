@@ -76,6 +76,10 @@ const auth = {
     return res.json(); // { file_url }
   },
 
+  async disconnectTelegram() {
+    return api.post('/auth/telegram/disconnect');
+  },
+
   async generateProposal(prompt) {
     const data = await api.post('/ai/proposal', { prompt });
     return data?.text ?? '';

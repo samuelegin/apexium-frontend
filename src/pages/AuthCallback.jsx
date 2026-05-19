@@ -33,10 +33,21 @@ export default function AuthCallback() {
       // Login flow: save token and redirect
       localStorage.setItem('apex_token', token);
       refetch().then(() => navigate('/', { replace: true }));
-    } else if (telegramId && telegramUsername) {
-      // Profile connection flow: TelegramProfileConnect will handle the params
-      // Just redirect to profile to avoid error
-      navigate('/profile', { replace: true });
+      return;
+    }
+
+    const profileParams = new URLSearchParams();
+    if (telegramId && telegramUsername) {
+      profileParams.set('telegram_id', telegramId);
+      profileParams.set('telegram_username', telegramUsername);
+    }
+    if (searchParams.get('discord_id') && searchParams.get('discord_username')) {
+      profileParams.set('discord_id', searchParams.get('discord_id'));
+      profileParams.set('discord_username', searchParams.get('discord_username'));
+    }
+
+    if (profileParams.toString()) {
+      navigate(`/profile?${profileParams.toString()}`, { replace: true });
     } else {
       navigate('/login', { replace: true });
     }

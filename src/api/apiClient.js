@@ -26,10 +26,22 @@ function handleUnauthorized() {
 
 async function request(method, path, body) {
   const token = getToken();
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  // Add cache-busting query param for GET requests
+  let url = `${BASE_URL}${path}`;
+  if (method === 'GET') {
+    const separator = path.includes('?') ? '&' : '?';
+    url += `${separator}t=${Date.now()}`;
+  }
+
+  const res = await fetch(url, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
