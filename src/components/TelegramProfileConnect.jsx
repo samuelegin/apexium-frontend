@@ -1,65 +1,72 @@
 /**
  * TelegramProfileConnect.jsx
- * Full-page redirect flow:
- *   Click → backend widget page → Telegram authorizes
- *   → backend saves + redirects to /profile?telegram_connected=1
- *   → this component detects the param, toasts, clears URL
+ * Embeds the Telegram widget directly in the React page (data-onauth mode).
+ * No backend widget page, no redirect hell.
+ * Flow: widget loads → user clicks → Telegram calls onTelegramAuth(user)
+ *       → we POST to backend → backend saves → we refetch + toast
  */
-import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import auth from '@/api/authApi';
 import { toast } from 'sonner';
 import { MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import auth from '@/api/authApi';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
-
-const TELEGRAM_ERROR_MESSAGES = {
-  missing_payload:     'Telegram auth failed — no data received.',
-  invalid_signature:   'Telegram auth failed — invalid signature.',
-  expired:             'Telegram session expired. Please try again.',
-  user_not_found:      'Your account was not found. Please refresh and retry.',
-  already_linked:      'This Telegram account is already linked to another user.',
-  server_misconfigured:'Server error. Please contact support.',
-  server_error:        'Something went wrong. Please try again.',
-};
+const API_BASE      = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const BOT_USERNAME  = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
 
 export default function TelegramProfileConnect({ telegramId, telegramUsername }) {
-  const { refetch, user }                   = useAuth();
-  const [searchParams]                      = useSearchParams();
-  const navigate                            = useNavigate();
-  const [disconnecting, setDisconnecting]   = useState(false);
-  const [connecting, setConnecting]         = useState(false);
+  const { refetch, user }                 = useAuth();
+  const widgetRef                         = useRef(null);
+  const [saving, setSaving]               = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [widgetReady, setWidgetReady]     = useState(false);
 
   useEffect(() => {
-    const connected = searchParams.get('telegram_connected');
-    const error     = searchParams.get('telegram_error');
+    if (!BOT_USERNAME || !user?.id || telegramId) return;
 
-    if (connected === '1') {
-      refetch()
-        .catch(() => {})
-        .finally(() => {
-          toast.success('Telegram connected!');
-          navigate('/profile', { replace: true });
+    // Expose callback globally so Telegram widget can call it
+    window.__onTelegramAuth = async (tgUser) => {
+      setSaving(true);
+      try {
+        await fetch(`${API_BASE}/auth/telegram/connect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('apex_token')}`,
+          },
+          body: JSON.stringify({ ...tgUser, user_id: user.id }),
+        }).then(r => {
+          if (!r.ok) throw new Error('Failed to connect');
+          return r.json();
         });
-    } else if (error) {
-      const msg = TELEGRAM_ERROR_MESSAGES[error] || 'Telegram connection failed.';
-      toast.error(msg);
-      navigate('/profile', { replace: true });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        await refetch();
+        toast.success('Telegram connected!');
+      } catch (err) {
+        console.error('[TelegramConnect]', err);
+        toast.error(err.message || 'Failed to connect Telegram');
+      } finally {
+        setSaving(false);
+      }
+    };
 
-  const handleConnect = () => {
-    if (!user?.id) {
-      toast.error('Not authenticated. Please refresh.');
-      return;
+    // Inject Telegram widget script
+    if (widgetRef.current && !widgetRef.current.hasChildNodes()) {
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.setAttribute('data-telegram-login', BOT_USERNAME);
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-onauth', '__onTelegramAuth(user)');
+      script.setAttribute('data-request-access', 'write');
+      script.setAttribute('data-userpic', 'false');
+      script.async = true;
+      script.onload = () => setWidgetReady(true);
+      widgetRef.current.appendChild(script);
     }
-    setConnecting(true);
-    const origin = window.location.origin;
-    window.location.href = `${API_BASE}/auth/telegram?origin=${encodeURIComponent(origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
-  };
+
+    return () => { delete window.__onTelegramAuth; };
+  }, [user?.id, telegramId]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -93,27 +100,25 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
                 Connected as <span className="font-semibold">@{telegramUsername}</span>
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handleConnect} disabled={connecting} className="text-xs">
-                {connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Change'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting} className="text-xs text-destructive">
-                {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Disconnect'}
-              </Button>
-            </div>
+            <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting} className="text-xs text-destructive">
+              {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Disconnect'}
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Connect your Telegram account so projects can reach you.
             </p>
-            <Button onClick={handleConnect} disabled={connecting} className="w-full bg-primary text-primary-foreground gap-2">
-              {connecting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
-              ) : (
-                <><MessageCircle className="w-4 h-4" /> Connect Telegram</>
-              )}
-            </Button>
+            {saving ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Connecting...
+              </div>
+            ) : (
+              <div ref={widgetRef} />
+            )}
+            {!BOT_USERNAME && (
+              <p className="text-xs text-destructive">VITE_TELEGRAM_BOT_USERNAME not set</p>
+            )}
           </div>
         )}
       </CardContent>
