@@ -59,13 +59,13 @@ const auth = {
     return data;
   },
 
-  async uploadFile(file) {
+  async uploadFile(file, type = 'general') {
     const token = localStorage.getItem(TOKEN_KEY);
     const form  = new FormData();
     form.append('file', file);
 
     const res = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL ?? '/api'}/uploads`,
+      `${import.meta.env.VITE_API_BASE_URL ?? '/api'}/uploads?type=${type}`,
       {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -73,7 +73,7 @@ const auth = {
       },
     );
     if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-    return res.json(); // { file_url }
+    return res.json(); // { file_url, user }
   },
 
   async disconnectTelegram() {

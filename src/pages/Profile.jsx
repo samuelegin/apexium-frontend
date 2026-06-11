@@ -57,9 +57,9 @@ export default function Profile() {
       const previewUrl = URL.createObjectURL(file);
       setAvatarUrl(previewUrl);
       toast.success('Uploading avatar…');
-      const res = await auth.uploadFile(file);
+      const res = await auth.uploadFile(file, 'avatar');
       if (!res || !res.file_url) throw new Error('No file_url returned from upload');
-      const cachedUrl = `${res.file_url}?t=${Date.now()}`;
+      const cachedUrl = res.file_url;
       await updateProfile({
         username:  username.replace('@', ''),
         bio,
@@ -80,9 +80,9 @@ export default function Profile() {
     try {
       if (file.size > 5 * 1024 * 1024) { toast.error('CV must be less than 5MB'); return; }
       toast.success('Uploading CV…');
-      const res = await auth.uploadFile(file);
+      const res = await auth.uploadFile(file, 'cv');
       if (!res || !res.file_url) throw new Error('No file_url returned from upload');
-      const cachedUrl = `${res.file_url}?t=${Date.now()}`;
+      const cachedUrl = res.file_url;
       await updateProfile({ cv_url: cachedUrl });
       setCvUrl(cachedUrl);
       toast.success('CV uploaded successfully!');
