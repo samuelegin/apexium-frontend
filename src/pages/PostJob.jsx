@@ -148,6 +148,7 @@ export default function PostJob() {
       if (!result.success) {
         await Job.update(job.id, { escrow_error: result.error });
         toast.warning('Job created but escrow deposit failed. You can retry from the job page.', { duration: 6000 });
+        navigate(`/job/${job.id}`);
       } else {
         await Job.update(job.id, { escrow_tx_hash: result.txHash, escrow_funded: true });
       }
