@@ -1,8 +1,11 @@
 /**
- * TelegramProfileConnect.jsx — connect/disconnect Telegram on the profile page
- * Uses popup + postMessage pattern.
+ * TelegramProfileConnect.jsx
+ * Full-page redirect approach — no popup, no postMessage.
+ * Click → go to backend widget → Telegram authorizes → backend saves username
+ * → redirects back to /profile?telegram_connected=1
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import auth from '@/api/authApi';
 import { toast } from 'sonner';
@@ -13,62 +16,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 export default function TelegramProfileConnect({ telegramId, telegramUsername }) {
-  const { updateProfile, refetch, user } = useAuth();
-  const [connecting,    setConnecting]   = useState(false);
+  const { refetch, user }               = useAuth();
+  const [searchParams]                  = useSearchParams();
+  const navigate                        = useNavigate();
   const [disconnecting, setDisconnecting] = useState(false);
 
-  const handleConnectClick = () => {
+  // When backend redirects back with ?telegram_connected=1, refetch and toast
+  useEffect(() => {
+    if (searchParams.get('telegram_connected') === '1') {
+      refetch().then(() => {
+        toast.success('Telegram connected!');
+        navigate('/profile', { replace: true });
+      }).catch(() => {
+        toast.success('Telegram connected!');
+        navigate('/profile', { replace: true });
+      });
+    }
+  }, []);
+
+  const handleConnect = () => {
     if (!user?.id) {
-      toast.error('Not authenticated. Please refresh and try again.');
+      toast.error('Not authenticated. Please refresh.');
       return;
     }
-    setConnecting(true);
-
-    const origin   = window.location.origin;
-    const popupUrl = `${API_BASE}/auth/telegram?origin=${encodeURIComponent(origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
-    const popup    = window.open(popupUrl, 'tg_profile', 'width=480,height=560,left=200,top=100');
-
-    if (!popup) {
-      window.location.href = popupUrl;
-      return;
-    }
-
-    const onMessage = async (e) => {
-      if (e.origin !== origin) return;
-      const data = e.data;
-      if (!data || typeof data !== 'object') return;
-
-      window.removeEventListener('message', onMessage);
-      setConnecting(false);
-
-      if (data.type === 'telegram_profile') {
-        try {
-          await updateProfile({
-            telegram_id:       String(data.telegram_id),
-            telegram_username: String(data.telegram_username),
-          });
-          await refetch();
-          toast.success(`Telegram connected! (@${data.telegram_username})`);
-        } catch (err) {
-          console.error('[TelegramProfileConnect] save error:', err);
-          toast.error('Failed to save Telegram connection');
-        }
-      } else if (data.error === 'already_linked') {
-        toast.error('This Telegram account is already linked to another user.');
-      } else if (data.error) {
-        toast.error(`Telegram connection failed: ${data.error}`);
-      }
-    };
-
-    window.addEventListener('message', onMessage);
-
-    const timer = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(timer);
-        window.removeEventListener('message', onMessage);
-        setConnecting(false);
-      }
-    }, 500);
+    const origin = window.location.origin;
+    // Backend will save telegram data then redirect to /profile?telegram_connected=1
+    window.location.href = `${API_BASE}/auth/telegram?origin=${encodeURIComponent(origin)}&callback_type=profile&user_id=${encodeURIComponent(user.id)}`;
   };
 
   const handleDisconnect = async () => {
@@ -78,7 +51,6 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
       await refetch();
       toast.success('Telegram disconnected');
     } catch (err) {
-      console.error('[TelegramProfileConnect] disconnect error:', err);
       toast.error('Failed to disconnect Telegram');
     } finally {
       setDisconnecting(false);
@@ -105,10 +77,10 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handleConnectClick} disabled={connecting || disconnecting} className="text-xs">
-                {connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Change'}
+              <Button size="sm" variant="outline" onClick={handleConnect} className="text-xs">
+                Change
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting || connecting} className="text-xs text-destructive">
+              <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting} className="text-xs text-destructive">
                 {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Disconnect'}
               </Button>
             </div>
@@ -118,12 +90,9 @@ export default function TelegramProfileConnect({ telegramId, telegramUsername })
             <p className="text-sm text-muted-foreground">
               Connect your Telegram account so projects can reach you.
             </p>
-            <Button onClick={handleConnectClick} disabled={connecting} className="w-full bg-primary text-primary-foreground gap-2">
-              {connecting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Connecting...</>
-              ) : (
-                <><MessageCircle className="w-4 h-4" />Connect Telegram</>
-              )}
+            <Button onClick={handleConnect} className="w-full bg-primary text-primary-foreground gap-2">
+              <MessageCircle className="w-4 h-4" />
+              Connect Telegram
             </Button>
           </div>
         )}
