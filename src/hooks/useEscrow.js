@@ -144,23 +144,15 @@ export function useEscrow() {
       const amount       = parseUnits(String(amountUSD), 6); // USDC = 6 decimals
       const account      = walletClient.account.address;
 
-      // 1. Check allowance and approve if needed
-      const allowance = await publicClient.readContract({
+      // Always approve — skips the allowance read which uses publicClient
+      // and fails on overloaded public RPCs before MetaMask can show the popup.
+      const approveTxHash = await walletClient.writeContract({
         address:      usdcAddress,
         abi:          ERC20_ABI,
-        functionName: 'allowance',
-        args:         [account, escrowAddress],
+        functionName: 'approve',
+        args:         [escrowAddress, amount],
       });
-
-      if (allowance < amount) {
-        const approveTxHash = await walletClient.writeContract({
-          address:      usdcAddress,
-          abi:          ERC20_ABI,
-          functionName: 'approve',
-          args:         [escrowAddress, amount],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      }
+      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
 
       // 2. Fund escrow
       const fundTxHash = await walletClient.writeContract({
