@@ -1,20 +1,21 @@
 import { useCallback } from 'react';
-import { useWalletClient, usePublicClient, useChainId, useSwitchChain, useConfig } from 'wagmi';
-import { getContract, parseUnits, keccak256, toBytes } from 'viem';
-import { writeContract, waitForTransactionReceipt } from 'wagmi/actions';
+import { useWalletClient, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
+import { parseUnits, keccak256, toBytes } from 'viem';
+import { waitForTransactionReceipt } from 'wagmi/actions';
+import { useConfig } from 'wagmi';
 import { TARGET_CHAIN } from '@/lib/wagmi';
 
-const MAINNET_ID  = 8453;
-const SEPOLIA_ID  = 84532;
+const MAINNET_ID = 8453;
+const SEPOLIA_ID = 84532;
 
 const ESCROW_ADDRESS = {
-  [MAINNET_ID]:  import.meta.env.VITE_ESCROW_ADDRESS_MAINNET ?? '',
-  [SEPOLIA_ID]:  import.meta.env.VITE_ESCROW_ADDRESS_SEPOLIA ?? '',
+  [MAINNET_ID]: import.meta.env.VITE_ESCROW_ADDRESS_MAINNET ?? '',
+  [SEPOLIA_ID]: import.meta.env.VITE_ESCROW_ADDRESS_SEPOLIA ?? '',
 };
 
 const USDC_ADDRESS = {
-  [MAINNET_ID]:  '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  [SEPOLIA_ID]:  '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  [MAINNET_ID]: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  [SEPOLIA_ID]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 };
 
 const ESCROW_ABI = [
@@ -93,11 +94,11 @@ export function toJobId(uuid) {
 }
 
 export function useEscrow() {
-  const { data: walletClient }  = useWalletClient();
-  const publicClient            = usePublicClient();
-  const chainId                 = useChainId();
-  const { switchChainAsync }    = useSwitchChain();
-  const config                  = useConfig();
+  const { data: walletClient } = useWalletClient();
+  const publicClient           = usePublicClient();
+  const chainId                = useChainId();
+  const { switchChainAsync }   = useSwitchChain();
+  const config                 = useConfig();
 
   const escrowAddress = ESCROW_ADDRESS[TARGET_CHAIN.id];
   const usdcAddress   = USDC_ADDRESS[TARGET_CHAIN.id];
@@ -114,37 +115,37 @@ export function useEscrow() {
     console.log('[useEscrow] usdcAddress:', usdcAddress);
     console.log('[useEscrow] walletClient:', !!walletClient);
     console.log('[useEscrow] TARGET_CHAIN:', TARGET_CHAIN);
+
+    // ── Guards ────────────────────────────────────────────────────────────────
     if (!walletClient) return { success: false, error: 'Wallet not connected' };
+    if (!escrowAddress) return { success: false, error: 'Escrow contract not configured (VITE_ESCROW_ADDRESS env missing)' };
+    if (!usdcAddress)   return { success: false, error: 'USDC address missing for this chain' };
 
     try {
-      console.log('[useEscrow] calling ensureChain...');
       await ensureChain();
-      console.log('[useEscrow] ensureChain done');
 
-      console.log('[useEscrow] building tx...');
       const jobIdBytes32 = toJobId(jobUUID);
       const amount       = parseUnits(String(amountUSD), 6);
 
-      // Use wagmi/actions writeContract — routes through wagmi's transport (Alchemy)
-      // instead of MetaMask's internal RPC which is rate-limited
-      console.log('[useEscrow] sending approve via wagmi/actions...');
-      const approveTxHash = await writeContract(config, {
+      // ── Use walletClient.writeContract so MetaMask/wallet popup is triggered ──
+      console.log('[useEscrow] sending approve via walletClient...');
+      const approveTxHash = await walletClient.writeContract({
         address:      usdcAddress,
         abi:          ERC20_ABI,
         functionName: 'approve',
         args:         [escrowAddress, amount],
-        chainId:      TARGET_CHAIN.id,
+        chain:        TARGET_CHAIN,
       });
       console.log('[useEscrow] approve tx:', approveTxHash);
       await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
 
-      console.log('[useEscrow] sending fundJob via wagmi/actions...');
-      const fundTxHash = await writeContract(config, {
+      console.log('[useEscrow] sending fundJob via walletClient...');
+      const fundTxHash = await walletClient.writeContract({
         address:      escrowAddress,
         abi:          ESCROW_ABI,
         functionName: 'fundJob',
         args:         [jobIdBytes32, jobberAddress, amount],
-        chainId:      TARGET_CHAIN.id,
+        chain:        TARGET_CHAIN,
       });
       console.log('[useEscrow] fundJob tx:', fundTxHash);
       await waitForTransactionReceipt(config, { hash: fundTxHash, chainId: TARGET_CHAIN.id });
@@ -158,16 +159,18 @@ export function useEscrow() {
   }, [walletClient, publicClient, chainId, escrowAddress, usdcAddress, config]);
 
   const cancelJob = useCallback(async (jobUUID) => {
-    if (!walletClient) return { success: false, error: 'Wallet not connected' };
+    if (!walletClient)  return { success: false, error: 'Wallet not connected' };
+    if (!escrowAddress) return { success: false, error: 'Escrow contract not configured' };
 
     try {
       await ensureChain();
-      const txHash = await writeContract(config, {
+
+      const txHash = await walletClient.writeContract({
         address:      escrowAddress,
         abi:          ESCROW_ABI,
         functionName: 'cancelJob',
         args:         [toJobId(jobUUID)],
-        chainId:      TARGET_CHAIN.id,
+        chain:        TARGET_CHAIN,
       });
       await waitForTransactionReceipt(config, { hash: txHash, chainId: TARGET_CHAIN.id });
 
@@ -197,8 +200,8 @@ export function useEscrow() {
     fundJob,
     cancelJob,
     getJobStatus,
-    isConnected:    !!walletClient,
-    networkName:    TARGET_CHAIN.name,
-    isTestnet:      TARGET_CHAIN.id === 31337 || TARGET_CHAIN.id === 84532,
+    isConnected: !!walletClient,
+    networkName: TARGET_CHAIN.name,
+    isTestnet:   TARGET_CHAIN.id === 31337 || TARGET_CHAIN.id === 84532,
   };
 }
