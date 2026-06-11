@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
-import { useWalletClient, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
+import { useWalletClient, usePublicClient, useChainId, useSwitchChain, useConfig } from 'wagmi';
 import { getContract, parseUnits, keccak256, toBytes } from 'viem';
+import { writeContract, waitForTransactionReceipt } from 'wagmi/actions';
 import { TARGET_CHAIN } from '@/lib/wagmi';
 
-// ─── Addresses ────────────────────────────────────────────────────────────────
-
-// Chain IDs
 const MAINNET_ID  = 8453;
 const SEPOLIA_ID  = 84532;
 
@@ -18,8 +16,6 @@ const USDC_ADDRESS = {
   [MAINNET_ID]:  '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   [SEPOLIA_ID]:  '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 };
-
-// ─── ABIs ─────────────────────────────────────────────────────────────────────
 
 const ESCROW_ABI = [
   {
@@ -90,42 +86,28 @@ const ERC20_ABI = [
   },
 ];
 
-// ─── Status enum (mirrors Solidity) ──────────────────────────────────────────
-
 export const EscrowStatus = { EMPTY: 0, FUNDED: 1, RELEASED: 2, REFUNDED: 3 };
-
-// ─── Helper: derive bytes32 jobId from UUID string ────────────────────────────
 
 export function toJobId(uuid) {
   return keccak256(toBytes(uuid));
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useEscrow() {
-  const { data: walletClient }      = useWalletClient();
-  const publicClient                = usePublicClient();
-  const chainId                     = useChainId();
-  const { switchChainAsync }        = useSwitchChain();
+  const { data: walletClient }  = useWalletClient();
+  const publicClient            = usePublicClient();
+  const chainId                 = useChainId();
+  const { switchChainAsync }    = useSwitchChain();
+  const config                  = useConfig();
 
   const escrowAddress = ESCROW_ADDRESS[TARGET_CHAIN.id];
   const usdcAddress   = USDC_ADDRESS[TARGET_CHAIN.id];
 
-  // Ensure the wallet is on the right chain before any write
   async function ensureChain() {
     if (chainId !== TARGET_CHAIN.id) {
       await switchChainAsync({ chainId: TARGET_CHAIN.id });
     }
   }
 
-  /**
-   * Employer: approve USDC spend + deposit into escrow.
-   * RainbowKit handles the wallet picker — just call this.
-   *
-   * @param {string} jobUUID       — backend job UUID
-   * @param {string} jobberAddress — jobber's wallet address (0x...)
-   * @param {number} amountUSD     — payment in USD (e.g. 500)
-   */
   const fundJob = useCallback(async (jobUUID, jobberAddress, amountUSD) => {
     console.log('[useEscrow] fundJob called', { jobUUID, jobberAddress, amountUSD });
     console.log('[useEscrow] escrowAddress:', escrowAddress);
@@ -141,27 +123,31 @@ export function useEscrow() {
 
       console.log('[useEscrow] building tx...');
       const jobIdBytes32 = toJobId(jobUUID);
-      const amount       = parseUnits(String(amountUSD), 6); // USDC = 6 decimals
-      const account      = walletClient.account.address;
+      const amount       = parseUnits(String(amountUSD), 6);
 
-      // Always approve — skips the allowance read which uses publicClient
-      // and fails on overloaded public RPCs before MetaMask can show the popup.
-      const approveTxHash = await walletClient.writeContract({
+      // Use wagmi/actions writeContract — routes through wagmi's transport (Alchemy)
+      // instead of MetaMask's internal RPC which is rate-limited
+      console.log('[useEscrow] sending approve via wagmi/actions...');
+      const approveTxHash = await writeContract(config, {
         address:      usdcAddress,
         abi:          ERC20_ABI,
         functionName: 'approve',
         args:         [escrowAddress, amount],
+        chainId:      TARGET_CHAIN.id,
       });
-      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+      console.log('[useEscrow] approve tx:', approveTxHash);
+      await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
 
-      // 2. Fund escrow
-      const fundTxHash = await walletClient.writeContract({
+      console.log('[useEscrow] sending fundJob via wagmi/actions...');
+      const fundTxHash = await writeContract(config, {
         address:      escrowAddress,
         abi:          ESCROW_ABI,
         functionName: 'fundJob',
         args:         [jobIdBytes32, jobberAddress, amount],
+        chainId:      TARGET_CHAIN.id,
       });
-      await publicClient.waitForTransactionReceipt({ hash: fundTxHash });
+      console.log('[useEscrow] fundJob tx:', fundTxHash);
+      await waitForTransactionReceipt(config, { hash: fundTxHash, chainId: TARGET_CHAIN.id });
 
       return { success: true, txHash: fundTxHash };
     } catch (err) {
@@ -169,26 +155,21 @@ export function useEscrow() {
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
-  }, [walletClient, publicClient, chainId, escrowAddress, usdcAddress]);
+  }, [walletClient, publicClient, chainId, escrowAddress, usdcAddress, config]);
 
-  /**
-   * Employer: cancel job and reclaim USDC (only while FUNDED).
-   */
   const cancelJob = useCallback(async (jobUUID) => {
     if (!walletClient) return { success: false, error: 'Wallet not connected' };
 
     try {
-      console.log('[useEscrow] calling ensureChain...');
       await ensureChain();
-      console.log('[useEscrow] ensureChain done');
-
-      const txHash = await walletClient.writeContract({
+      const txHash = await writeContract(config, {
         address:      escrowAddress,
         abi:          ESCROW_ABI,
         functionName: 'cancelJob',
         args:         [toJobId(jobUUID)],
+        chainId:      TARGET_CHAIN.id,
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await waitForTransactionReceipt(config, { hash: txHash, chainId: TARGET_CHAIN.id });
 
       return { success: true, txHash };
     } catch (err) {
@@ -196,12 +177,8 @@ export function useEscrow() {
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
-  }, [walletClient, publicClient, chainId, escrowAddress]);
+  }, [walletClient, chainId, escrowAddress, config]);
 
-  /**
-   * Read-only: get on-chain escrow status for a job.
-   * Returns EscrowStatus number (0–3), or null on error.
-   */
   const getJobStatus = useCallback(async (jobUUID) => {
     try {
       const status = await publicClient.readContract({
