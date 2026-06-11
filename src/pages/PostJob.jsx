@@ -18,6 +18,7 @@ import KPIBuilder from '@/components/postjob/KPIBuilder';
 import { Job, KPI } from '@/api/entities';
 import { useEscrow } from '@/hooks/useEscrow';
 import WalletButton from '@/components/wallet/WalletButton';
+import { v4 as uuidv4 } from 'uuid';
 
 const CATEGORIES = [
   { value: 'marketing',   label: 'Marketing' },
@@ -85,12 +86,12 @@ export default function PostJob() {
   const navigate       = useNavigate();
   const escrow         = useEscrow();
 
-  const [step,     setStep]     = useState(1);
-  const [title,    setTitle]    = useState('');
-  const [category, setCategory] = useState('');
-  const [kpis,     setKpis]     = useState([{ name: '', target_value: '', weight: '', baseline: '' }]);
-  const [deadline, setDeadline] = useState('');
-  const [payment,  setPayment]  = useState('');
+  const [step,        setStep]        = useState(1);
+  const [title,       setTitle]       = useState('');
+  const [category,    setCategory]    = useState('');
+  const [kpis,        setKpis]        = useState([{ name: '', target_value: '', weight: '', baseline: '' }]);
+  const [deadline,    setDeadline]    = useState('');
+  const [payment,     setPayment]     = useState('');
   const [jobberWallet, setJobberWallet] = useState('');
 
   const totalWeight = kpis.reduce((sum, k) => sum + (Number(k.weight) || 0), 0);
@@ -109,6 +110,20 @@ export default function PostJob() {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
+      // ── Step 1: trigger wallet FIRST ─────────────────────────────────────
+      // Generate a UUID for the job upfront — this becomes the on-chain jobId
+      const jobUUID = uuidv4();
+      const escrowJobberAddr = jobberWallet.trim() || '0x0000000000000000000000000000000000000000';
+
+      toast.info('Please confirm the transactions in your wallet…', { duration: 4000 });
+
+      const result = await escrow.fundJob(jobUUID, escrowJobberAddr, Number(payment));
+
+      if (!result.success) {
+        throw new Error(result.error ?? 'Wallet transaction failed or was rejected');
+      }
+
+      // ── Step 2: wallet confirmed — now create job in DB ───────────────────
       const maxWeight  = Math.max(...kpis.map(k => Number(k.weight)));
       const kpiSummary = kpis
         .sort((a, b) => Number(b.weight) - Number(a.weight))
@@ -117,6 +132,7 @@ export default function PostJob() {
         .join(', ');
 
       const job = await Job.create({
+        id:                jobUUID,        // pass the UUID so DB id matches on-chain jobId
         title,
         category,
         employer_email:    user.email,
@@ -126,7 +142,8 @@ export default function PostJob() {
         status:            'open',
         applicant_count:   0,
         kpi_summary:       kpiSummary,
-        escrow_funded:     false,
+        escrow_funded:     true,
+        escrow_tx_hash:    result.txHash,
       });
 
       await KPI.bulkCreate(
@@ -142,17 +159,6 @@ export default function PostJob() {
         }))
       );
 
-      const escrowJobberAddr = jobberWallet.trim() || '0x0000000000000000000000000000000000000000';
-      const result = await escrow.fundJob(job.id, escrowJobberAddr, Number(payment));
-
-      if (!result.success) {
-        await Job.update(job.id, { escrow_error: result.error });
-        toast.warning('Job created but escrow deposit failed. You can retry from the job page.', { duration: 6000 });
-        navigate(`/job/${job.id}`);
-      } else {
-        await Job.update(job.id, { escrow_tx_hash: result.txHash, escrow_funded: true });
-      }
-
       return job;
     },
     onSuccess: (job) => {
@@ -160,7 +166,9 @@ export default function PostJob() {
       navigate(`/job/${job.id}`);
     },
     onError: (err) => {
-      toast.error(err.message ?? 'Failed to publish job');
+      // Don't create the job — wallet was rejected or failed
+      const msg = err.message ?? 'Failed to publish job';
+      toast.error(msg);
     },
   });
 
@@ -306,7 +314,7 @@ export default function PostJob() {
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
-                You'll need to approve the USDC spend in your wallet and confirm two transactions (approve + deposit).
+                Your wallet will pop up first. Confirm two transactions (approve + deposit), then the job is created.
               </span>
             </div>
           </div>

@@ -44,24 +44,6 @@ const ESCROW_ABI = [
     inputs: [{ name: 'jobId', type: 'bytes32' }],
     outputs: [{ name: '', type: 'uint8' }],
   },
-  {
-    name: 'getJob',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'jobId', type: 'bytes32' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        components: [
-          { name: 'employer', type: 'address' },
-          { name: 'jobber',   type: 'address' },
-          { name: 'amount',   type: 'uint256' },
-          { name: 'status',   type: 'uint8'   },
-        ],
-      },
-    ],
-  },
 ];
 
 const ERC20_ABI = [
@@ -74,16 +56,6 @@ const ERC20_ABI = [
       { name: 'amount',  type: 'uint256' },
     ],
     outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    name: 'allowance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner',   type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
   },
 ];
 
@@ -111,31 +83,22 @@ export function useEscrow() {
   }
 
   /**
-   * Sends a transaction by:
-   * 1. Estimating gas via publicClient (our RPC — not MetaMask's)
-   * 2. Getting nonce via publicClient
-   * 3. Signing + sending via walletClient (triggers wallet popup)
+   * Sends raw calldata via eth_sendTransaction — bypasses viem/wagmi's
+   * internal simulation step that hits MetaMask's own RPC and causes -32002.
+   * MetaMask receives the raw tx and shows the popup directly.
    */
-  async function sendTx(contractAddress, abi, functionName, args) {
-    const data = encodeFunctionData({ abi, functionName, args });
+  async function sendRawTx(to, data) {
+    // eth_requestAccounts first to ensure MetaMask is unlocked
+    await walletClient.request({ method: 'eth_requestAccounts' });
 
-    // Use our RPC for gas estimation — avoids MetaMask's rate-limited endpoint
-    const [gas, nonce] = await Promise.all([
-      publicClient.estimateGas({
-        account: address,
-        to:      contractAddress,
+    const txHash = await walletClient.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from:  address,
+        to,
         data,
-      }),
-      publicClient.getTransactionCount({ address }),
-    ]);
-
-    // This call triggers the wallet popup — just signs & sends, no simulation
-    const txHash = await walletClient.sendTransaction({
-      to:    contractAddress,
-      data,
-      gas:   gas * 120n / 100n, // +20% buffer
-      nonce,
-      chain: TARGET_CHAIN,
+        // No gas — MetaMask will estimate it itself, avoiding our RPC call too
+      }],
     });
 
     return txHash;
@@ -159,31 +122,42 @@ export function useEscrow() {
       const jobIdBytes32 = toJobId(jobUUID);
       const amount       = parseUnits(String(amountUSD), 6);
 
-      // ── Tx 1: USDC approve — MetaMask popup fires here ────────────────────
-      console.log('[useEscrow] sending approve...');
-      const approveTxHash = await sendTx(
-        usdcAddress,
-        ERC20_ABI,
-        'approve',
-        [escrowAddress, amount],
-      );
-      console.log('[useEscrow] approve tx:', approveTxHash);
-      await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
+      // ── Tx 1: USDC approve ────────────────────────────────────────────────
+      // Raw eth_sendTransaction → MetaMask popup fires immediately
+      const approveData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [escrowAddress, amount],
+      });
 
-      // ── Tx 2: fundJob — second MetaMask popup ─────────────────────────────
-      console.log('[useEscrow] sending fundJob...');
-      const fundTxHash = await sendTx(
-        escrowAddress,
-        ESCROW_ABI,
-        'fundJob',
-        [jobIdBytes32, jobberAddress, amount],
-      );
+      console.log('[useEscrow] sending approve — MetaMask popup should fire now');
+      const approveTxHash = await sendRawTx(usdcAddress, approveData);
+      console.log('[useEscrow] approve tx:', approveTxHash);
+
+      await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
+      console.log('[useEscrow] approve confirmed');
+
+      // ── Tx 2: fundJob ─────────────────────────────────────────────────────
+      const fundData = encodeFunctionData({
+        abi: ESCROW_ABI,
+        functionName: 'fundJob',
+        args: [jobIdBytes32, jobberAddress, amount],
+      });
+
+      console.log('[useEscrow] sending fundJob — second MetaMask popup');
+      const fundTxHash = await sendRawTx(escrowAddress, fundData);
       console.log('[useEscrow] fundJob tx:', fundTxHash);
+
       await waitForTransactionReceipt(config, { hash: fundTxHash, chainId: TARGET_CHAIN.id });
+      console.log('[useEscrow] fundJob confirmed');
 
       return { success: true, txHash: fundTxHash };
     } catch (err) {
       console.error('[useEscrow] ERROR:', err);
+      // User rejected = 4001
+      if (err.code === 4001 || err.message?.includes('User rejected')) {
+        return { success: false, error: 'Transaction rejected by user' };
+      }
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
@@ -197,12 +171,13 @@ export function useEscrow() {
     try {
       await ensureChain();
 
-      const txHash = await sendTx(
-        escrowAddress,
-        ESCROW_ABI,
-        'cancelJob',
-        [toJobId(jobUUID)],
-      );
+      const data = encodeFunctionData({
+        abi: ESCROW_ABI,
+        functionName: 'cancelJob',
+        args: [toJobId(jobUUID)],
+      });
+
+      const txHash = await sendRawTx(escrowAddress, data);
       await waitForTransactionReceipt(config, { hash: txHash, chainId: TARGET_CHAIN.id });
 
       return { success: true, txHash };
@@ -211,7 +186,7 @@ export function useEscrow() {
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
-  }, [walletClient, publicClient, address, chainId, escrowAddress, config]);
+  }, [walletClient, address, chainId, escrowAddress, config]);
 
   const getJobStatus = useCallback(async (jobUUID) => {
     try {
