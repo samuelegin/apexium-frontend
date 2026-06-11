@@ -1,12 +1,9 @@
 /**
  * AuthCallback.jsx — handles the redirect from OAuth and Telegram connections
- * Routes: 
- *   - /auth/callback?token=xxx (login flow)
- *   - /auth/callback?telegram_id=xxx&telegram_username=xxx (profile connection flow)
- *
- * Google/Login → backend → redirects here with JWT in URL
- * Telegram profile → backend → redirects here with telegram data in URL
- * We store the token and redirect, or pass through for profile params
+ * Routes:
+ *   - /auth/callback?token=xxx        (login flow — Telegram login, Google login)
+ *   - /auth/callback?telegram_id=xxx  (profile connection flow)
+ *   - /auth/callback?discord_id=xxx   (discord profile connection flow)
  */
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,40 +15,41 @@ export default function AuthCallback() {
   const { refetch }    = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const error = searchParams.get('error');
-    const telegramId = searchParams.get('telegram_id');
-    const telegramUsername = searchParams.get('telegram_username');
+    const token          = searchParams.get('token');
+    const error          = searchParams.get('error');
+    const telegramId     = searchParams.get('telegram_id');
+    const telegramUser   = searchParams.get('telegram_username');
+    const discordId      = searchParams.get('discord_id');
+    const discordUser    = searchParams.get('discord_username');
 
     if (error) {
-      console.error('[auth-callback] Google auth failed:', error);
-      navigate('/login?error=google_failed', { replace: true });
+      console.error('[auth-callback] auth failed:', error);
+      navigate('/login?error=auth_failed', { replace: true });
       return;
     }
 
     if (token) {
-      // Login flow: save token and redirect
+      // Login flow — save token then navigate home
       localStorage.setItem('apex_token', token);
-      refetch().then(() => navigate('/', { replace: true }));
+      refetch()
+        .catch(() => {}) // never block navigation on refetch failure
+        .finally(() => navigate('/', { replace: true }));
       return;
     }
 
+    // Profile connection flow — pass params through to /profile
     const profileParams = new URLSearchParams();
-    if (telegramId && telegramUsername) {
-      profileParams.set('telegram_id', telegramId);
-      profileParams.set('telegram_username', telegramUsername);
-    }
-    if (searchParams.get('discord_id') && searchParams.get('discord_username')) {
-      profileParams.set('discord_id', searchParams.get('discord_id'));
-      profileParams.set('discord_username', searchParams.get('discord_username'));
-    }
+    if (telegramId)  profileParams.set('telegram_id',       telegramId);
+    if (telegramUser) profileParams.set('telegram_username', telegramUser);
+    if (discordId)   profileParams.set('discord_id',        discordId);
+    if (discordUser) profileParams.set('discord_username',  discordUser);
 
     if (profileParams.toString()) {
       navigate(`/profile?${profileParams.toString()}`, { replace: true });
     } else {
       navigate('/login', { replace: true });
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
