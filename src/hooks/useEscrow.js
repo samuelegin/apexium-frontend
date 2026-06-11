@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { useWalletClient, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
-import { parseUnits, keccak256, toBytes } from 'viem';
+import { useWalletClient, usePublicClient, useChainId, useSwitchChain, useAccount } from 'wagmi';
+import { parseUnits, keccak256, toBytes, encodeFunctionData } from 'viem';
 import { waitForTransactionReceipt } from 'wagmi/actions';
 import { useConfig } from 'wagmi';
 import { TARGET_CHAIN } from '@/lib/wagmi';
@@ -96,6 +96,7 @@ export function toJobId(uuid) {
 export function useEscrow() {
   const { data: walletClient } = useWalletClient();
   const publicClient           = usePublicClient();
+  const { address }            = useAccount();
   const chainId                = useChainId();
   const { switchChainAsync }   = useSwitchChain();
   const config                 = useConfig();
@@ -109,16 +110,47 @@ export function useEscrow() {
     }
   }
 
+  /**
+   * Sends a transaction by:
+   * 1. Estimating gas via publicClient (our RPC — not MetaMask's)
+   * 2. Getting nonce via publicClient
+   * 3. Signing + sending via walletClient (triggers wallet popup)
+   */
+  async function sendTx(contractAddress, abi, functionName, args) {
+    const data = encodeFunctionData({ abi, functionName, args });
+
+    // Use our RPC for gas estimation — avoids MetaMask's rate-limited endpoint
+    const [gas, nonce] = await Promise.all([
+      publicClient.estimateGas({
+        account: address,
+        to:      contractAddress,
+        data,
+      }),
+      publicClient.getTransactionCount({ address }),
+    ]);
+
+    // This call triggers the wallet popup — just signs & sends, no simulation
+    const txHash = await walletClient.sendTransaction({
+      to:    contractAddress,
+      data,
+      gas:   gas * 120n / 100n, // +20% buffer
+      nonce,
+      chain: TARGET_CHAIN,
+    });
+
+    return txHash;
+  }
+
   const fundJob = useCallback(async (jobUUID, jobberAddress, amountUSD) => {
     console.log('[useEscrow] fundJob called', { jobUUID, jobberAddress, amountUSD });
     console.log('[useEscrow] escrowAddress:', escrowAddress);
     console.log('[useEscrow] usdcAddress:', usdcAddress);
     console.log('[useEscrow] walletClient:', !!walletClient);
-    console.log('[useEscrow] TARGET_CHAIN:', TARGET_CHAIN);
+    console.log('[useEscrow] address:', address);
 
-    // ── Guards ────────────────────────────────────────────────────────────────
-    if (!walletClient) return { success: false, error: 'Wallet not connected' };
-    if (!escrowAddress) return { success: false, error: 'Escrow contract not configured (VITE_ESCROW_ADDRESS env missing)' };
+    if (!walletClient)  return { success: false, error: 'Wallet not connected' };
+    if (!address)       return { success: false, error: 'No account found' };
+    if (!escrowAddress) return { success: false, error: 'Escrow contract not configured' };
     if (!usdcAddress)   return { success: false, error: 'USDC address missing for this chain' };
 
     try {
@@ -127,26 +159,25 @@ export function useEscrow() {
       const jobIdBytes32 = toJobId(jobUUID);
       const amount       = parseUnits(String(amountUSD), 6);
 
-      // ── Use walletClient.writeContract so MetaMask/wallet popup is triggered ──
-      console.log('[useEscrow] sending approve via walletClient...');
-      const approveTxHash = await walletClient.writeContract({
-        address:      usdcAddress,
-        abi:          ERC20_ABI,
-        functionName: 'approve',
-        args:         [escrowAddress, amount],
-        chain:        TARGET_CHAIN,
-      });
+      // ── Tx 1: USDC approve — MetaMask popup fires here ────────────────────
+      console.log('[useEscrow] sending approve...');
+      const approveTxHash = await sendTx(
+        usdcAddress,
+        ERC20_ABI,
+        'approve',
+        [escrowAddress, amount],
+      );
       console.log('[useEscrow] approve tx:', approveTxHash);
       await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
 
-      console.log('[useEscrow] sending fundJob via walletClient...');
-      const fundTxHash = await walletClient.writeContract({
-        address:      escrowAddress,
-        abi:          ESCROW_ABI,
-        functionName: 'fundJob',
-        args:         [jobIdBytes32, jobberAddress, amount],
-        chain:        TARGET_CHAIN,
-      });
+      // ── Tx 2: fundJob — second MetaMask popup ─────────────────────────────
+      console.log('[useEscrow] sending fundJob...');
+      const fundTxHash = await sendTx(
+        escrowAddress,
+        ESCROW_ABI,
+        'fundJob',
+        [jobIdBytes32, jobberAddress, amount],
+      );
       console.log('[useEscrow] fundJob tx:', fundTxHash);
       await waitForTransactionReceipt(config, { hash: fundTxHash, chainId: TARGET_CHAIN.id });
 
@@ -156,22 +187,22 @@ export function useEscrow() {
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
-  }, [walletClient, publicClient, chainId, escrowAddress, usdcAddress, config]);
+  }, [walletClient, publicClient, address, chainId, escrowAddress, usdcAddress, config]);
 
   const cancelJob = useCallback(async (jobUUID) => {
     if (!walletClient)  return { success: false, error: 'Wallet not connected' };
+    if (!address)       return { success: false, error: 'No account found' };
     if (!escrowAddress) return { success: false, error: 'Escrow contract not configured' };
 
     try {
       await ensureChain();
 
-      const txHash = await walletClient.writeContract({
-        address:      escrowAddress,
-        abi:          ESCROW_ABI,
-        functionName: 'cancelJob',
-        args:         [toJobId(jobUUID)],
-        chain:        TARGET_CHAIN,
-      });
+      const txHash = await sendTx(
+        escrowAddress,
+        ESCROW_ABI,
+        'cancelJob',
+        [toJobId(jobUUID)],
+      );
       await waitForTransactionReceipt(config, { hash: txHash, chainId: TARGET_CHAIN.id });
 
       return { success: true, txHash };
@@ -180,7 +211,7 @@ export function useEscrow() {
       const msg = err.shortMessage ?? err.message ?? 'Transaction failed';
       return { success: false, error: msg };
     }
-  }, [walletClient, chainId, escrowAddress, config]);
+  }, [walletClient, publicClient, address, chainId, escrowAddress, config]);
 
   const getJobStatus = useCallback(async (jobUUID) => {
     try {
