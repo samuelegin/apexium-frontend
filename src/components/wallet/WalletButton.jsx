@@ -1,6 +1,3 @@
-/**
- * WalletButton — saves connected wallet address to the backend on connect.
- */
 import { useEffect, useRef } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';

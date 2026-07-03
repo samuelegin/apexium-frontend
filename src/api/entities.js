@@ -39,3 +39,21 @@ export const TaskSubmission = entity('task-submissions');
 export const XPLog = entity('xp-logs');
 export const Referral = entity('referrals');
 export const User = entity('users');
+
+/**
+ * Escrow — talks to the non-CRUD escrow routes in the backend (src/escrow.js).
+ * These aren't REST resources, so they don't fit the entity() helper shape.
+ */
+export const Escrow = {
+  /** Tell the backend a tx was sent so it decodes the receipt immediately
+   *  instead of waiting on the ~15s reconcile safety-net. */
+  notify: (jobId, txHash, type) => api.post('/escrow/notify', { jobId, txHash, type }),
+
+  /** Employer proposes the pod payout split. shares: [{ email, share }]. */
+  proposePodShares: (applicationId, shares) =>
+    api.post('/escrow/pod-shares', { applicationId, shares }),
+
+  /** A pod member approves the currently-proposed split. */
+  approvePodShares: (applicationId) =>
+    api.post('/escrow/pod-shares/approve', { applicationId }),
+};

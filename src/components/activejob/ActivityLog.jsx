@@ -20,8 +20,8 @@ function getEventConfig(type) {
     case 'proof_submitted':return { icon: Clock,        color: 'text-chart-3',     bg: 'bg-chart-3/10',     label: 'Proof submitted' };
     case 'proof_approved': return { icon: CheckCircle2, color: 'text-accent',      bg: 'bg-accent/10',      label: 'Proof approved' };
     case 'proof_rejected': return { icon: XCircle,      color: 'text-destructive', bg: 'bg-destructive/10', label: 'Proof rejected' };
-    case 'extension':      return { icon: Timer,        color: 'text-chart-3',     bg: 'bg-chart-3/10',     label: 'Deadline extension' };
-    default:               return { icon: Activity,     color: 'text-muted-foreground', bg: 'bg-secondary', label: 'Activity' };
+    case 'extension': return { icon: Timer,        color: 'text-chart-3',     bg: 'bg-chart-3/10',     label: 'Deadline extension' };
+    default: return { icon: Activity,     color: 'text-muted-foreground', bg: 'bg-secondary', label: 'Activity' };
   }
 }
 

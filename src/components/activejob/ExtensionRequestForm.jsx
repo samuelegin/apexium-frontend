@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { addHours, format } from 'date-fns';
 import { Job, Notification } from '@/api/entities';
 
-// TALENT: submit an extension request
 export function ExtensionRequestDialog({ job, open, onClose }) {
   const queryClient = useQueryClient();
   const [hours, setHours] = useState('24');
@@ -93,7 +92,6 @@ export function ExtensionRequestDialog({ job, open, onClose }) {
   );
 }
 
-// PROJECT: review an extension request
 export function ExtensionReviewCard({ job }) {
   const queryClient = useQueryClient();
   const [customHours, setCustomHours] = useState(String(job.extension_hours || ''));

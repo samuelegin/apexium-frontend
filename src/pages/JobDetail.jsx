@@ -10,13 +10,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Job, KPI, Application, Notification, User as UserEntity } from '@/api/entities';
+import { Job, KPI, Application, Notification, User as UserEntity, Escrow as EscrowApi } from '@/api/entities';
 import { checkCanApply } from '@/lib/applicationGuards';
 import KPICard from '@/components/shared/KPICard.jsx';
 import ProposalHelper from '@/components/jobdetail/ProposalHelper';
 import PodBuilder from '@/components/jobdetail/PodBuilder';
 import QuickApplyButton from '@/components/jobdetail/QuickApplyButton';
 import ApplicantsList from '@/components/jobdetail/ApplicantsList';
+import TxProgressModal from '@/components/shared/TxProgressModal';
+import WalletButton from '@/components/wallet/WalletButton';
 import { useEscrow } from '@/hooks/useEscrow';
 
 const STATUS_STYLES = {
@@ -24,6 +26,12 @@ const STATUS_STYLES = {
   in_progress: 'bg-amber-100 text-amber-700',
   completed:   'bg-green-100 text-green-700',
 };
+
+function parsePodMembers(app) {
+  if (!app) return [];
+  if (Array.isArray(app.pod_members)) return app.pod_members;
+  try { return JSON.parse(app.pod_members || '[]'); } catch { return []; }
+}
 
 export default function JobDetail() {
   const jobId = new URLSearchParams(window.location.search).get('id') || window.location.pathname.split('/').pop();
@@ -36,6 +44,15 @@ export default function JobDetail() {
   const [applyMode,   setApplyMode]   = useState('individual');
   const [podName,     setPodName]     = useState('');
   const [podMembers,  setPodMembers]  = useState([]);
+
+  // ── Fund-at-selection tx modal state ───────────────────────────────────────
+  const [fundModalOpen, setFundModalOpen] = useState(false);
+  const [txStatus,      setTxStatus]      = useState({});
+  const [txError,       setTxError]       = useState(null);
+  const FUND_STEPS = [
+    { key: 'approve', label: 'Approve USDC' },
+    { key: 'fund',    label: 'Lock funds in escrow' },
+  ];
 
   /* ── Queries ─────────────────────────────────────────────────────────────── */
   const { data: job, isLoading: loadingJob } = useQuery({
@@ -140,58 +157,103 @@ export default function JobDetail() {
     onError: (err) => toast.error(err.message || 'Submission failed.'),
   });
 
+  /**
+   * Sends the actual on-chain fundJob call for a given app + finalized split,
+   * driving the TxProgressModal, then persists the result. The v3 contract
+   * locks `recipients`/`shares` permanently the moment this confirms.
+   */
+  const fundJobOnChain = async (app, recipients, shares) => {
+    setTxStatus({});
+    setTxError(null);
+    setFundModalOpen(true);
+
+    const result = await escrow.fundJob(jobId, job.payment_amount, recipients, shares, (key, status) => {
+      if (key === 'error') return;
+      setTxStatus(prev => ({ ...prev, [key]: status }));
+    });
+
+    if (!result.success) {
+      setTxError(result.error);
+      return result;
+    }
+
+    // Let the backend decode the receipt right away instead of waiting on
+    // the ~15s reconcile safety-net.
+    try { await EscrowApi.notify(jobId, result.txHash, 'fund'); } catch (_) {}
+
+    await Job.update(jobId, {
+      status: 'in_progress',
+      selected_applicant_email: app.applicant_email,
+      selected_applicant_username: app.applicant_username,
+      escrow_funded: true,
+      escrow_tx_hash: result.txHash,
+    });
+    await Application.update(app.id, { status: 'accepted' });
+    await Notification.create({
+      user_email: app.applicant_email,
+      type: 'selected_for_job',
+      title: 'You were selected!',
+      message: `You've been selected for "${job.title}" — funds are now locked in escrow`,
+      job_id: jobId,
+    });
+
+    return result;
+  };
+
   const selectMutation = useMutation({
     mutationFn: async (app) => {
-      let jobberWallet = null;
-      try {
+      if (!escrow.isConnected) throw new Error('Connect your wallet first');
+
+      if (!app.is_pod) {
         const jobberUsers = await UserEntity.filter({ email: app.applicant_email });
-        jobberWallet = jobberUsers[0]?.wallet_address || null;
-      } catch (_) {}
-      await Job.update(jobId, {
-        status: 'in_progress',
-        selected_applicant_email: app.applicant_email,
-        selected_applicant_username: app.applicant_username,
-        jobber_wallet: jobberWallet,
-      });
-      await Application.update(app.id, { status: 'accepted' });
-      await Notification.create({
-        user_email: app.applicant_email,
-        type: 'selected_for_job',
-        title: 'You were selected!',
-        message: `You've been selected for "${job.title}"`,
-        job_id: jobId,
-      });
+        const wallet = jobberUsers[0]?.wallet_address;
+        if (!wallet) throw new Error(`@${app.applicant_username} hasn't connected a wallet yet`);
+
+        const result = await fundJobOnChain(app, [wallet], [100]);
+        if (!result.success) throw new Error(result.error || 'Funding failed');
+        return { funded: true };
+      }
+
+      // ── Pod path — split must be fully approved on-chain-adjacent before funding,
+      // since fundJob() locks recipients/shares forever the moment it's called.
+      const members = parsePodMembers(app);
+      if (members.length === 0) throw new Error('This pod has no members on file');
+
+      const allApproved = members.length > 0 && members.every(m => m.approved === true);
+      if (!allApproved) {
+        await EscrowApi.proposePodShares(
+          app.id,
+          members.map(m => ({ email: m.email, share: Number(m.share) }))
+        );
+        queryClient.invalidateQueries({ queryKey: ['job-applications'] });
+        throw new Error('Pod split proposed — waiting for every member to approve before funds can be locked');
+      }
+
+      const missingWallet = members.find(m => !m.wallet);
+      if (missingWallet) throw new Error(`@${missingWallet.username} hasn't provided a wallet address`);
+
+      const recipients = members.map(m => m.wallet);
+      const shares      = members.map(m => Number(m.share));
+      const result = await fundJobOnChain(app, recipients, shares);
+      if (!result.success) throw new Error(result.error || 'Funding failed');
+      return { funded: true };
     },
-    onSuccess: () => {
-      toast.success('Talent selected!');
+    onSuccess: (data) => {
+      if (data?.funded) toast.success('Talent selected — escrow funded!');
       queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['job-applications'] });
     },
+    onError: (err) => toast.error(err.message || 'Selection failed'),
   });
 
-  const retryFundingMutation = useMutation({
-    mutationFn: async () => {
-      const result = await escrow.fundJob(jobId, '0x0000000000000000000000000000000000000000', job.payment_amount);
-      if (!result.success) {
-        await Job.update(jobId, { escrow_error: result.error });
-        throw new Error(result.error);
-      } else {
-        await Job.update(jobId, { escrow_tx_hash: result.txHash, escrow_funded: true, escrow_error: null });
-      }
-    },
+  const approvePodShareMutation = useMutation({
+    mutationFn: async (applicationId) => EscrowApi.approvePodShares(applicationId),
     onSuccess: () => {
-      toast.success('Escrow funded! Job is now visible.');
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      toast.success('Split approved');
+      queryClient.invalidateQueries({ queryKey: ['my-application'] });
+      queryClient.invalidateQueries({ queryKey: ['job-applications'] });
     },
-    onError: (err) => toast.error(`Funding failed: ${err.message}`),
-  });
-
-  const deleteJobMutation = useMutation({
-    mutationFn: async () => {
-      await fetch(`/api/jobs/cleanup-unfunded/${jobId}`, { method: 'DELETE' });
-    },
-    onSuccess: () => { toast.success('Job deleted.'); navigate('/'); },
-    onError:   (err) => toast.error(`Delete failed: ${err.message}`),
+    onError: (err) => toast.error(err.message || 'Failed to approve'),
   });
 
   /* ── Loading / not found ─────────────────────────────────────────────────── */
@@ -297,6 +359,31 @@ export default function JobDetail() {
           </span>
         </div>
       )}
+
+      {/* Pod payout split — needs my approval before it can be funded on-chain */}
+      {myApplication?.is_pod && (() => {
+        const members = parsePodMembers(myApplication);
+        const mine    = members.find(m => m.email === user?.email);
+        if (!mine || mine.share === undefined || mine.approved) return null;
+        return (
+          <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 space-y-2">
+            <p className="text-sm font-medium text-foreground">
+              The employer proposed a payout split for your pod
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Your share: <span className="font-mono text-foreground">{mine.share}%</span> of ${job.payment_amount}.
+              Once every member approves, the employer can lock funds in escrow.
+            </p>
+            <button
+              onClick={() => approvePodShareMutation.mutate(myApplication.id)}
+              disabled={approvePodShareMutation.isPending}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {approvePodShareMutation.isPending ? 'Approving…' : 'Approve my share'}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Apply section */}
       {!isEmployer && job.status === 'open' && !myApplication && (
@@ -414,57 +501,40 @@ export default function JobDetail() {
         </div>
       )}
 
-      {/* Project — escrow error */}
-      {isEmployer && !job.escrow_funded && job.escrow_error && (
-        <div className="bg-card rounded-2xl border border-destructive/20 p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-destructive" />
-            <h2 className="text-base font-semibold text-destructive">Escrow funding failed</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            This job was created but escrow funding failed. It won't be visible to talents until funded.
-          </p>
-          <div className="bg-destructive/8 rounded-xl p-3">
-            <p className="text-xs font-mono text-destructive">{job.escrow_error}</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => retryFundingMutation.mutate()}
-              disabled={retryFundingMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
-            >
-              {retryFundingMutation.isPending
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Funding…</>
-                : <><DollarSign className="w-4 h-4" /> Retry Funding</>
-              }
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Delete this unfunded job?')) deleteJobMutation.mutate();
-              }}
-              disabled={deleteJobMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-destructive text-destructive text-sm font-medium hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-60"
-            >
-              {deleteJobMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Delete Job
-            </button>
-          </div>
+      {/* Project — applicants */}
+      {isEmployer && job.status === 'open' && (
+        <div className="space-y-3">
+          <h2 className="text-base font-semibold text-foreground">
+            Applicants ({applications.length})
+          </h2>
+
+          {!escrow.isConnected ? (
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5">
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <Info className="w-4 h-4 text-primary shrink-0" />
+                Connect your wallet to select talent — funds get locked in escrow the moment you do.
+              </div>
+              <WalletButton compact />
+            </div>
+          ) : (
+            <ApplicantsList
+              applications={applications}
+              onSelect={(app) => selectMutation.mutate(app)}
+              selectPending={selectMutation.isPending}
+            />
+          )}
         </div>
       )}
 
-      {/* Project — applicants */}
-      {isEmployer && job.status === 'open' && job.escrow_funded && (
-        <div>
-          <h2 className="text-base font-semibold text-foreground mb-3">
-            Applicants ({applications.length})
-          </h2>
-          <ApplicantsList
-            applications={applications}
-            onSelect={(app) => selectMutation.mutate(app)}
-            selectPending={selectMutation.isPending}
-          />
-        </div>
-      )}
+      <TxProgressModal
+        open={fundModalOpen}
+        title="Lock funds in escrow"
+        subtitle={`$${job.payment_amount} USDC — this permanently sets who gets paid`}
+        steps={FUND_STEPS}
+        status={txStatus}
+        error={txError}
+        onClose={() => setFundModalOpen(false)}
+      />
     </div>
   );
 }

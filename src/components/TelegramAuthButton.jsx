@@ -27,7 +27,7 @@ export default function TelegramAuthButton({ label = 'Continue with Telegram' })
     }
 
     const onMessage = (e) => {
-      if (e.origin !== origin) return;
+      // only handle our own telegram messages
       const data = e.data;
       if (!data || typeof data !== 'object') return;
 

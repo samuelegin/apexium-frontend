@@ -19,9 +19,9 @@ function PerformancePill({ label, value, accent }) {
 
 export default function ApplicantCard({ app, onSelect, selectPending }) {
   const [expanded, setExpanded] = useState(false);
-  const perf     = app.performance_snapshot || {};
-  const hasPerf  = perf.completed_jobs != null;
-  const score    = perf.avg_pi_score || 0;
+  const perf = app.performance_snapshot || {};
+  const hasPerf = perf.completed_jobs != null;
+  const score = perf.avg_pi_score || 0;
   const isTopPerformer = hasPerf && score >= 80;
 
   return (

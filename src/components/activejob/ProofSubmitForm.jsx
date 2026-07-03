@@ -43,13 +43,9 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
     }
   }, [open]);
 
-  // Anti-cheat: already submitted for this KPI?
   const alreadySubmitted = existingProofs.some(p => p.kpi_id === kpi.id);
-
-  // Anti-cheat: duplicate link across any proof in this job
   const isDuplicateLink = proofLink.trim() !== '' && existingProofs.some(p => p.proof_link === proofLink.trim());
 
-  // Validation state
   const urlValid = isValidUrl(proofLink);
   const metricFilled = metricAchieved.trim().length > 0;
   const canSubmit = (urlValid || uploadedUrl) && !isDuplicateLink && metricFilled && !alreadySubmitted;
@@ -137,7 +133,6 @@ export default function ProofSubmitForm({ kpi, jobId, existingProofs, open, onCl
     }
   };
 
-  // Already submitted — show locked state
   if (alreadySubmitted) {
     return (
       <Dialog open={open} onOpenChange={onClose}>

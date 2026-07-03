@@ -53,7 +53,7 @@ export default function PodBuilder({ currentUser, podName, setPodName, members, 
 
   const adminUsername = currentUser?.username || currentUser?.full_name || '';
 
-  const admin   = members.find(m => m.username === adminUsername) || { username: adminUsername, share: 0, verified: true };
+  const admin   = members.find(m => m.username === adminUsername) || { username: adminUsername, email: currentUser?.email, share: 0, verified: true };
   const others  = members.filter(m => m.username !== adminUsername);
   const allMembers = [admin, ...others];
 
@@ -97,7 +97,7 @@ export default function PodBuilder({ currentUser, podName, setPodName, members, 
   };
 
   const addMember = (userObj) => {
-    setMembers([...allMembers, { username: userObj.username, share: 0, verified: true, full_name: userObj.full_name }]);
+    setMembers([...allMembers, { username: userObj.username, email: userObj.email, share: 0, verified: true, full_name: userObj.full_name }]);
     setSearchInput('');
     setSearchResult(null);
   };

@@ -16,6 +16,7 @@ import ProofReviewForm from '@/components/activejob/ProofReviewForm';
 import DeadlineCountdown from '@/components/activejob/DeadlineCountdown';
 import ActivityLog from '@/components/activejob/ActivityLog';
 import { ExtensionRequestDialog, ExtensionReviewCard } from '@/components/activejob/ExtensionRequestForm';
+import EscrowActions from '@/components/activejob/EscrowActions';
 import { Job, KPI, ProofSubmission } from '@/api/entities';
 
 /* ── Proof status config ────────────────────────────────────────────────────── */
@@ -176,6 +177,9 @@ export default function ActiveJob() {
       {isJobber && job.extension_status === 'rejected' && (
         <Banner icon={XCircle} message="Extension request was rejected." variant="danger" />
       )}
+
+      {/* On-chain completion + claim — the two remaining wallet-signed steps */}
+      <EscrowActions job={job} isEmployer={isEmployer} isJobber={isJobber} />
 
       {/* Main grid */}
       <div className="grid lg:grid-cols-3 gap-6">

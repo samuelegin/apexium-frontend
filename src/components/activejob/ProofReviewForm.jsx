@@ -44,9 +44,11 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
         await KPI.update(kpi.id, { status: 'rejected', completion_percent: 0 });
       }
 
-      // ── Completion check: if all KPIs approved, mark job complete ──────────
-      // The backend relayer listens for job.status → 'completed' and then calls
-      // escrow.release(jobId) on-chain to send USDC to the talent.
+      // ── Completion check: if all KPIs approved, mark the job complete at the
+      // app level. This does NOT touch the chain — there is no relayer. The
+      // employer still has to sign confirmComplete() themselves (shown on the
+      // Active Job page via EscrowActions) before the payout unlocks, and the
+      // recipient(s) then sign claim() to actually receive the USDC.
       if (approved) {
         const allKpisData  = await KPI.filter({ job_id: job.id });
         const updatedKpis  = allKpisData.map(k => k.id === kpi.id ? { ...k, status: 'approved' } : k);
@@ -57,8 +59,6 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
             status:             'completed',
             last_activity_date: new Date().toISOString(),
           });
-          // Backend relayer should detect status:'completed' and call escrow.release()
-          // No on-chain call here — escrow release is done server-side via the relayer key.
         }
       }
 
@@ -67,14 +67,14 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
         type:    approved ? 'proof_approved' : 'proof_rejected',
         title:   approved ? 'Proof Approved! 🎉' : 'Proof Rejected',
         message: approved
-          ? `Your proof for "${kpi.name}" was approved!${isLastKpi ? ' All KPIs done — payment is being released.' : ''}`
+          ? `Your proof for "${kpi.name}" was approved!${isLastKpi ? ' All KPIs done — waiting on the employer to confirm completion on-chain.' : ''}`
           : `Your proof for "${kpi.name}" was rejected: ${rejectReason}`,
         job_id: job.id,
       });
     },
     onSuccess: (_, { approved }) => {
       if (approved && isLastKpi) {
-        toast.success('All KPIs approved — escrow release triggered!', { duration: 5000 });
+        toast.success('All KPIs approved — confirm completion on-chain from the Active Job page to unlock payout.', { duration: 6000 });
       } else {
         toast.success('Review submitted!');
       }
@@ -153,8 +153,9 @@ export default function ProofReviewForm({ proof, kpi, job, open, onClose, allKpi
               <div className="text-xs text-primary space-y-0.5">
                 <p className="font-semibold">This is the final KPI</p>
                 <p className="text-primary/80">
-                  Approving this will mark the job complete and trigger the escrow release —{' '}
-                  <span className="font-medium">${job?.payment_amount} USDC</span> will be sent to the talent's wallet.
+                  Approving this marks the job complete. You'll then need to confirm completion
+                  on-chain from the Active Job page before{' '}
+                  <span className="font-medium">${job?.payment_amount} USDC</span> can be claimed.
                 </p>
               </div>
             </div>

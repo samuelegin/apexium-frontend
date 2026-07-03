@@ -10,14 +10,12 @@ function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-/* ── Track if we already redirected to avoid loops ─────────────────────────── */
 let redirecting = false;
 
 function handleUnauthorized() {
   if (redirecting) return;
   redirecting = true;
   clearSession();
-  // Give any in-flight toasts a moment to clear, then hard redirect
   setTimeout(() => {
     window.location.href = '/';
     redirecting = false;
@@ -34,7 +32,6 @@ async function request(method, path, body) {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Add cache-busting query param for GET requests
   let url = `${BASE_URL}${path}`;
   if (method === 'GET') {
     const separator = path.includes('?') ? '&' : '?';
@@ -47,7 +44,6 @@ async function request(method, path, body) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  /* ── 401 — session expired or invalid token ─────────────────────────────── */
   if (res.status === 401) {
     handleUnauthorized();
     throw new Error('Session expired. Please sign in again.');
@@ -64,17 +60,16 @@ async function request(method, path, body) {
     throw error;
   }
 
-  // 204 No Content
   if (res.status === 204) return null;
   return res.json();
 }
 
 const api = {
-  get:    (path)        => request('GET',    path),
-  post:   (path, body)  => request('POST',   path, body),
-  put:    (path, body)  => request('PUT',    path, body),
-  patch:  (path, body)  => request('PATCH',  path, body),
-  delete: (path)        => request('DELETE', path),
+  get: (path) => request('GET',    path),
+  post: (path, body) => request('POST',   path, body),
+  put: (path, body) => request('PUT',    path, body),
+  patch: (path, body) => request('PATCH',  path, body),
+  delete: (path) => request('DELETE', path),
 };
 
 export default api;

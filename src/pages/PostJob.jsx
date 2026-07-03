@@ -16,8 +16,7 @@ import {
 import { toast } from 'sonner';
 import KPIBuilder from '@/components/postjob/KPIBuilder';
 import { Job, KPI } from '@/api/entities';
-import { useEscrow } from '@/hooks/useEscrow';
-import WalletButton from '@/components/wallet/WalletButton';
+import { TARGET_CHAIN, isTestnet } from '@/lib/wagmi';
 import { v4 as uuidv4 } from 'uuid';
 
 const CATEGORIES = [
@@ -84,7 +83,6 @@ export default function PostJob() {
   const { user }       = useAuth();
   const { isEmployer } = useMode();
   const navigate       = useNavigate();
-  const escrow         = useEscrow();
 
   const [step,        setStep]        = useState(1);
   const [title,       setTitle]       = useState('');
@@ -92,7 +90,6 @@ export default function PostJob() {
   const [kpis,        setKpis]        = useState([{ name: '', target_value: '', weight: '', baseline: '' }]);
   const [deadline,    setDeadline]    = useState('');
   const [payment,     setPayment]     = useState('');
-  const [jobberWallet, setJobberWallet] = useState('');
 
   const totalWeight = kpis.reduce((sum, k) => sum + (Number(k.weight) || 0), 0);
 
@@ -108,22 +105,15 @@ export default function PostJob() {
     if (!isEmployer) navigate('/', { replace: true });
   }, [isEmployer, navigate]);
 
+  // Posting a job no longer touches the wallet. The v3 escrow contract locks
+  // `recipients[]`/`shares[]` permanently the moment fundJob() is called, and
+  // that split isn't known until a talent (or approved pod) is actually
+  // selected — so escrow funding now happens on the job detail page at
+  // selection time, not here.
   const publishMutation = useMutation({
     mutationFn: async () => {
-      // ── Step 1: trigger wallet FIRST ─────────────────────────────────────
-      // Generate a UUID for the job upfront — this becomes the on-chain jobId
-      const jobUUID = uuidv4();
-      const escrowJobberAddr = jobberWallet.trim() || '0x0000000000000000000000000000000000000000';
+      const jobUUID = uuidv4(); // becomes the on-chain jobId once funded later
 
-      toast.info('Please confirm the transactions in your wallet…', { duration: 4000 });
-
-      const result = await escrow.fundJob(jobUUID, escrowJobberAddr, Number(payment));
-
-      if (!result.success) {
-        throw new Error(result.error ?? 'Wallet transaction failed or was rejected');
-      }
-
-      // ── Step 2: wallet confirmed — now create job in DB ───────────────────
       const maxWeight  = Math.max(...kpis.map(k => Number(k.weight)));
       const kpiSummary = kpis
         .sort((a, b) => Number(b.weight) - Number(a.weight))
@@ -132,7 +122,7 @@ export default function PostJob() {
         .join(', ');
 
       const job = await Job.create({
-        id:                jobUUID,        // pass the UUID so DB id matches on-chain jobId
+        id:                jobUUID,
         title,
         category,
         employer_email:    user.email,
@@ -142,8 +132,7 @@ export default function PostJob() {
         status:            'open',
         applicant_count:   0,
         kpi_summary:       kpiSummary,
-        escrow_funded:     true,
-        escrow_tx_hash:    result.txHash,
+        escrow_funded:     false,
       });
 
       await KPI.bulkCreate(
@@ -162,11 +151,10 @@ export default function PostJob() {
       return job;
     },
     onSuccess: (job) => {
-      toast.success('Job published and escrow funded!');
+      toast.success('Job published — select a talent to lock in escrow');
       navigate(`/job/${job.id}`);
     },
     onError: (err) => {
-      // Don't create the job — wallet was rejected or failed
       const msg = err.message ?? 'Failed to publish job';
       toast.error(msg);
     },
@@ -269,7 +257,7 @@ export default function PostJob() {
             <div>
               <h2 className="text-base font-semibold text-foreground">Payment & escrow</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Funds are held in a smart contract on Base and released only when all KPIs are approved.
+                Set the budget now — you'll lock it into escrow once you select a talent.
               </p>
             </div>
 
@@ -294,16 +282,16 @@ export default function PostJob() {
                 <span className="text-sm font-medium text-foreground">Escrow-protected payment</span>
               </div>
               <ul className="space-y-1.5 text-xs text-muted-foreground pl-6 list-disc">
-                <li>Your USDC is locked in the <span className="font-medium text-foreground">work3labs Escrow</span> contract on Base</li>
-                <li>Funds are only released when <span className="font-medium text-foreground">all KPIs are approved</span></li>
-                <li>You can cancel and reclaim funds before a talent is selected</li>
+                <li>No wallet action needed to publish — this just posts the listing</li>
+                <li>When you select a talent (or approve a pod split), you'll fund the <span className="font-medium text-foreground">work3labs Escrow</span> contract on Base for exactly that recipient</li>
+                <li>Funds are only released once all KPIs are approved and you confirm completion</li>
               </ul>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-primary/10">
                 <Wallet className="w-3.5 h-3.5" />
                 <span>
-                  Network: <span className="text-foreground font-medium">{escrow.networkName}</span>
+                  Network: <span className="text-foreground font-medium">{TARGET_CHAIN.name}</span>
                 </span>
-                {escrow.isTestnet && (
+                {isTestnet && (
                   <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/20 font-medium">
                     TESTNET
                   </span>
@@ -314,7 +302,7 @@ export default function PostJob() {
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
-                Your wallet will pop up first. Confirm two transactions (approve + deposit), then the job is created.
+                Publishing just saves the listing — your wallet isn't involved until you pick who gets paid.
               </span>
             </div>
           </div>
@@ -339,11 +327,6 @@ export default function PostJob() {
           >
             Next <ArrowRight className="w-4 h-4" />
           </button>
-        ) : !escrow.isConnected ? (
-          <div className="flex flex-col items-end gap-1">
-            <WalletButton />
-            <span className="text-[11px] text-muted-foreground">Connect wallet to publish</span>
-          </div>
         ) : (
           <button
             onClick={() => publishMutation.mutate()}
@@ -351,8 +334,8 @@ export default function PostJob() {
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {publishMutation.isPending
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Awaiting wallet…</>
-              : <><Rocket className="w-4 h-4" /> Publish & Fund Escrow</>
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing…</>
+              : <><Rocket className="w-4 h-4" /> Publish Job</>
             }
           </button>
         )}

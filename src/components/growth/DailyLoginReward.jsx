@@ -17,16 +17,10 @@ export default function DailyLoginReward({ user, onXPAwarded }) {
   async function attemptAward() {
     try {
       await awardXP(user.email, 'daily_login', XP_VALUES.daily_login, 'Daily Login Reward');
-
-      // Show the toast FIRST before doing anything else
       setShow(true);
       setTimeout(() => setShow(false), 4000);
       console.log(`[DailyXP] +${XP_VALUES.daily_login} XP awarded to ${user.email}`);
-
-      // THEN silently refresh user in background so Profile shows updated XP.
-      // onXPAwarded is bootstrap() which sets isLoading=true and unmounts
-      // AppLayout — killing the toast. So we call it AFTER the toast is set.
-      if (onXPAwarded) onXPAwarded(); // intentionally NOT awaited
+      if (onXPAwarded) onXPAwarded();
 
     } catch (err) {
       console.log('[DailyXP] Not awarded:', err?.message);
