@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -45,13 +45,12 @@ export default function JobDetail() {
   const [podName,     setPodName]     = useState('');
   const [podMembers,  setPodMembers]  = useState([]);
 
-  // ── Fund-at-selection tx modal state ───────────────────────────────────────
+  // ── Set-payout tx modal state — a single call, no USDC movement ────────────
   const [fundModalOpen, setFundModalOpen] = useState(false);
   const [txStatus,      setTxStatus]      = useState({});
   const [txError,       setTxError]       = useState(null);
-  const FUND_STEPS = [
-    { key: 'approve', label: 'Approve USDC' },
-    { key: 'fund',    label: 'Lock funds in escrow' },
+  const PAYOUT_STEPS = [
+    { key: 'payout', label: 'Lock in payout' },
   ];
 
   /* ── Queries ─────────────────────────────────────────────────────────────── */
@@ -158,16 +157,18 @@ export default function JobDetail() {
   });
 
   /**
-   * Sends the actual on-chain fundJob call for a given app + finalized split,
-   * driving the TxProgressModal, then persists the result. The v3 contract
-   * locks `recipients`/`shares` permanently the moment this confirms.
+   * Sends the actual on-chain setPayout call for a given app + finalized
+   * split, driving the TxProgressModal, then persists the result. IMPORTANT:
+   * setPayout() can only ever be called ONCE per job — the contract reverts
+   * with PayoutAlreadySet on a second attempt. Make sure the split is truly
+   * final (all pod members approved) before this runs.
    */
-  const fundJobOnChain = async (app, recipients, shares) => {
+  const setPayoutOnChain = async (app, recipients, shares) => {
     setTxStatus({});
     setTxError(null);
     setFundModalOpen(true);
 
-    const result = await escrow.fundJob(jobId, job.payment_amount, recipients, shares, (key, status) => {
+    const result = await escrow.setPayout(jobId, recipients, shares, (key, status) => {
       if (key === 'error') return;
       setTxStatus(prev => ({ ...prev, [key]: status }));
     });
@@ -179,21 +180,20 @@ export default function JobDetail() {
 
     // Let the backend decode the receipt right away instead of waiting on
     // the ~15s reconcile safety-net.
-    try { await EscrowApi.notify(jobId, result.txHash, 'fund'); } catch (_) {}
+    try { await EscrowApi.notify(jobId, result.txHash, 'payout'); } catch (_) {}
 
     await Job.update(jobId, {
       status: 'in_progress',
       selected_applicant_email: app.applicant_email,
       selected_applicant_username: app.applicant_username,
-      escrow_funded: true,
-      escrow_tx_hash: result.txHash,
+      payout_tx_hash: result.txHash,
     });
     await Application.update(app.id, { status: 'accepted' });
     await Notification.create({
       user_email: app.applicant_email,
       type: 'selected_for_job',
       title: 'You were selected!',
-      message: `You've been selected for "${job.title}" — funds are now locked in escrow`,
+      message: `You've been selected for "${job.title}" — payout is locked in, ready once the job's done`,
       job_id: jobId,
     });
 
@@ -203,19 +203,20 @@ export default function JobDetail() {
   const selectMutation = useMutation({
     mutationFn: async (app) => {
       if (!escrow.isConnected) throw new Error('Connect your wallet first');
+      if (job.escrow_status !== 'funded') throw new Error('This job needs to be funded first — go to My Jobs');
 
       if (!app.is_pod) {
         const jobberUsers = await UserEntity.filter({ email: app.applicant_email });
         const wallet = jobberUsers[0]?.wallet_address;
         if (!wallet) throw new Error(`@${app.applicant_username} hasn't connected a wallet yet`);
 
-        const result = await fundJobOnChain(app, [wallet], [100]);
-        if (!result.success) throw new Error(result.error || 'Funding failed');
+        const result = await setPayoutOnChain(app, [wallet], [100]);
+        if (!result.success) throw new Error(result.error || 'Locking in payout failed');
         return { funded: true };
       }
 
-      // ── Pod path — split must be fully approved on-chain-adjacent before funding,
-      // since fundJob() locks recipients/shares forever the moment it's called.
+      // ── Pod path — split must be fully approved off-chain before locking
+      // it in, since setPayout() can only ever be called once per job.
       const members = parsePodMembers(app);
       if (members.length === 0) throw new Error('This pod has no members on file');
 
@@ -226,7 +227,7 @@ export default function JobDetail() {
           members.map(m => ({ email: m.email, share: Number(m.share) }))
         );
         queryClient.invalidateQueries({ queryKey: ['job-applications'] });
-        throw new Error('Pod split proposed — waiting for every member to approve before funds can be locked');
+        throw new Error('Pod split proposed — waiting for every member to approve before it can be locked in');
       }
 
       const missingWallet = members.find(m => !m.wallet);
@@ -234,12 +235,12 @@ export default function JobDetail() {
 
       const recipients = members.map(m => m.wallet);
       const shares      = members.map(m => Number(m.share));
-      const result = await fundJobOnChain(app, recipients, shares);
-      if (!result.success) throw new Error(result.error || 'Funding failed');
+      const result = await setPayoutOnChain(app, recipients, shares);
+      if (!result.success) throw new Error(result.error || 'Locking in payout failed');
       return { funded: true };
     },
     onSuccess: (data) => {
-      if (data?.funded) toast.success('Talent selected — escrow funded!');
+      if (data?.funded) toast.success('Talent selected — payout locked in!');
       queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['job-applications'] });
     },
@@ -385,6 +386,22 @@ export default function JobDetail() {
         );
       })()}
 
+      {/* Draft — not yet funded */}
+      {isEmployer && job.status === 'draft' && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+          <div className="flex items-center gap-2 text-sm text-foreground">
+            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+            This is a private draft — nobody can see it until you fund it.
+          </div>
+          <Link
+            to="/my-jobs"
+            className="shrink-0 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Fund from My Jobs
+          </Link>
+        </div>
+      )}
+
       {/* Apply section */}
       {!isEmployer && job.status === 'open' && !myApplication && (
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
@@ -512,7 +529,7 @@ export default function JobDetail() {
             <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <Info className="w-4 h-4 text-primary shrink-0" />
-                Connect your wallet to select talent — funds get locked in escrow the moment you do.
+                Connect your wallet to select talent — this permanently locks in who gets paid.
               </div>
               <WalletButton compact />
             </div>
@@ -528,9 +545,9 @@ export default function JobDetail() {
 
       <TxProgressModal
         open={fundModalOpen}
-        title="Lock funds in escrow"
-        subtitle={`$${job.payment_amount} USDC — this permanently sets who gets paid`}
-        steps={FUND_STEPS}
+        title="Lock in payout"
+        subtitle={`$${job.payment_amount} USDC is already in escrow — this permanently sets who gets paid`}
+        steps={PAYOUT_STEPS}
         status={txStatus}
         error={txError}
         onClose={() => setFundModalOpen(false)}

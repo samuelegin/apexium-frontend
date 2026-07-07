@@ -105,11 +105,12 @@ export default function PostJob() {
     if (!isEmployer) navigate('/', { replace: true });
   }, [isEmployer, navigate]);
 
-  // Posting a job no longer touches the wallet. The v3 escrow contract locks
-  // `recipients[]`/`shares[]` permanently the moment fundJob() is called, and
-  // that split isn't known until a talent (or approved pod) is actually
-  // selected — so escrow funding now happens on the job detail page at
-  // selection time, not here.
+  // Posting a job creates a private draft only — nothing is visible in the
+  // marketplace and no wallet is touched. The job becomes real (visible,
+  // fundable-from-here-on) once the employer funds it from My Jobs, which
+  // calls fundJob(jobId, amount) — no recipient needed at that point either,
+  // since v4's fundJob() takes just employer+amount. Recipient assignment
+  // (setPayout) happens later still, once a talent is actually selected.
   const publishMutation = useMutation({
     mutationFn: async () => {
       const jobUUID = uuidv4(); // becomes the on-chain jobId once funded later
@@ -129,7 +130,7 @@ export default function PostJob() {
         employer_username: user.username || user.full_name,
         deadline,
         payment_amount:    Number(payment),
-        status:            'open',
+        status:            'draft',
         applicant_count:   0,
         kpi_summary:       kpiSummary,
         escrow_funded:     false,
@@ -150,9 +151,9 @@ export default function PostJob() {
 
       return job;
     },
-    onSuccess: (job) => {
-      toast.success('Job published — select a talent to lock in escrow');
-      navigate(`/job/${job.id}`);
+    onSuccess: () => {
+      toast.success('Draft saved — fund it from My Jobs to publish it to the marketplace');
+      navigate('/my-jobs');
     },
     onError: (err) => {
       const msg = err.message ?? 'Failed to publish job';
@@ -282,8 +283,9 @@ export default function PostJob() {
                 <span className="text-sm font-medium text-foreground">Escrow-protected payment</span>
               </div>
               <ul className="space-y-1.5 text-xs text-muted-foreground pl-6 list-disc">
-                <li>No wallet action needed to publish — this just posts the listing</li>
-                <li>When you select a talent (or approve a pod split), you'll fund the <span className="font-medium text-foreground">work3labs Escrow</span> contract on Base for exactly that recipient</li>
+                <li>This creates a private draft — no wallet action needed yet, and nobody can see it</li>
+                <li>Go to <span className="font-medium text-foreground">My Jobs</span> and click <span className="font-medium text-foreground">Fund Job</span> to lock the budget in the <span className="font-medium text-foreground">work3labs Escrow</span> contract on Base — that's what makes it visible in the marketplace</li>
+                <li>Picking a talent later locks in who gets paid — separately, after funding</li>
                 <li>Funds are only released once all KPIs are approved and you confirm completion</li>
               </ul>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-primary/10">
@@ -302,7 +304,7 @@ export default function PostJob() {
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
-                Publishing just saves the listing — your wallet isn't involved until you pick who gets paid.
+                This saves a private draft — your wallet isn't involved until you fund it from My Jobs.
               </span>
             </div>
           </div>
@@ -334,8 +336,8 @@ export default function PostJob() {
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {publishMutation.isPending
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing…</>
-              : <><Rocket className="w-4 h-4" /> Publish Job</>
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+              : <><Rocket className="w-4 h-4" /> Save Draft</>
             }
           </button>
         )}

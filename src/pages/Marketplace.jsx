@@ -65,7 +65,7 @@ export default function Marketplace() {
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['marketplace-jobs'],
-    queryFn: () => Job.filter({}, '-created_date', 200),
+    queryFn: () => Job.filter({ status: 'open' }, '-created_date', 200),
   });
 
   const hasActiveFilters = category !== 'all' || payRange !== 'all' || sort !== 'newest';

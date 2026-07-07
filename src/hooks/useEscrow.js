@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
-import { useWalletClient, usePublicClient, useChainId, useSwitchChain, useAccount } from 'wagmi';
+import { useWalletClient, usePublicClient, useChainId, useSwitchChain, useAccount, useConfig } from 'wagmi';
 import { parseUnits, keccak256, toBytes, encodeFunctionData } from 'viem';
 import { waitForTransactionReceipt } from 'wagmi/actions';
-import { useConfig } from 'wagmi';
 import { TARGET_CHAIN } from '@/lib/wagmi';
 
 const MAINNET_ID = 8453;
@@ -18,15 +17,30 @@ const USDC_ADDRESS = {
   [SEPOLIA_ID]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 };
 
-/* ── Real v3 ApexEscrow ABI — matches ApexEscrow.sol exactly ────────────────── */
+/* ── Real v4 ApexEscrow ABI — matches the redeployed contract exactly ───────────
+ * fundJob() no longer takes recipients/shares — just employer + amount.
+ * setPayout() assigns the split separately, and can only ever be called ONCE
+ * per job (locked permanently after that — no re-picking).
+ * getJob() now also returns feeBpsAtFund/feeRecipientAtFund, snapshotted at
+ * fund time so a later admin fee change never affects jobs already funded.
+ */
 const ESCROW_ABI = [
   {
     name: 'fundJob',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
+      { name: 'jobId',  type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'setPayout',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
       { name: 'jobId',      type: 'bytes32' },
-      { name: 'amount',     type: 'uint256' },
       { name: 'recipients', type: 'address[]' },
       { name: 'shares',     type: 'uint256[]' },
     ],
@@ -89,12 +103,14 @@ const ESCROW_ABI = [
       name: '',
       type: 'tuple',
       components: [
-        { name: 'employer',        type: 'address' },
-        { name: 'amount',          type: 'uint256' },
-        { name: 'status',          type: 'uint8' },
-        { name: 'disputed',        type: 'bool' },
-        { name: 'fundedAt',        type: 'uint256' },
-        { name: 'timeoutDeadline', type: 'uint256' },
+        { name: 'employer',           type: 'address' },
+        { name: 'amount',             type: 'uint256' },
+        { name: 'status',             type: 'uint8' },
+        { name: 'disputed',           type: 'bool' },
+        { name: 'fundedAt',           type: 'uint256' },
+        { name: 'timeoutDeadline',    type: 'uint256' },
+        { name: 'feeBpsAtFund',       type: 'uint256' },
+        { name: 'feeRecipientAtFund', type: 'address' },
       ],
     }],
   },
@@ -113,6 +129,19 @@ const ESCROW_ABI = [
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: 'gross', type: 'uint256' }],
+    outputs: [
+      { name: 'net', type: 'uint256' },
+      { name: 'fee', type: 'uint256' },
+    ],
+  },
+  {
+    name: 'previewFeeForJob',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'jobId', type: 'bytes32' },
+      { name: 'gross', type: 'uint256' },
+    ],
     outputs: [
       { name: 'net', type: 'uint256' },
       { name: 'fee', type: 'uint256' },
@@ -204,27 +233,19 @@ export function useEscrow() {
   }
 
   /**
-   * fundJob — approve USDC then lock the payout split on-chain.
-   * `recipients`/`shares` are FINAL the moment this confirms — the contract
-   * has no way to change them later, so callers must only invoke this once
-   * the split is fully agreed (solo: 1 recipient @ 100; pod: all approved).
+   * fundJob — approve USDC then lock the budget on-chain. No recipient is
+   * needed yet; that's a separate, later setPayout() call. This is what
+   * turns a private draft into a real, money-backed job.
    *
-   * onStep(stepKey, status) is called for a progress modal to render live:
+   * onStep(stepKey, status) drives the progress modal:
    *   stepKey: 'approve' | 'fund'
    *   status:  'pending' | 'confirming' | 'done' | 'error'
    */
-  const fundJob = useCallback(async (jobUUID, amountUSD, recipients, shares, onStep = () => {}) => {
+  const fundJob = useCallback(async (jobUUID, amountUSD, onStep = () => {}) => {
     if (!walletClient)  return { success: false, error: 'Wallet not connected' };
     if (!address)       return { success: false, error: 'No account found' };
     if (!escrowAddress) return { success: false, error: 'Escrow contract not configured' };
     if (!usdcAddress)   return { success: false, error: 'USDC address missing for this chain' };
-    if (!recipients?.length || recipients.length !== shares?.length) {
-      return { success: false, error: 'recipients and shares must be the same non-empty length' };
-    }
-    const totalShare = shares.reduce((s, v) => s + Number(v), 0);
-    if (totalShare !== 100) {
-      return { success: false, error: `shares must sum to 100 (got ${totalShare})` };
-    }
 
     try {
       await ensureChain();
@@ -244,12 +265,12 @@ export function useEscrow() {
       await waitForTransactionReceipt(config, { hash: approveTxHash, chainId: TARGET_CHAIN.id });
       onStep('approve', 'done');
 
-      // ── Tx 2: fundJob ─────────────────────────────────────────────────────
+      // ── Tx 2: fundJob(jobId, amount) — no recipients yet ───────────────────
       onStep('fund', 'pending');
       const fundData = encodeFunctionData({
         abi: ESCROW_ABI,
         functionName: 'fundJob',
-        args: [jobIdBytes32, amount, recipients, shares.map(s => BigInt(s))],
+        args: [jobIdBytes32, amount],
       });
       const fundTxHash = await sendRawTx(escrowAddress, fundData);
       onStep('fund', 'confirming');
@@ -262,6 +283,44 @@ export function useEscrow() {
       return { success: false, error: friendlyError(err) };
     }
   }, [walletClient, address, chainId, escrowAddress, usdcAddress, config]);
+
+  /**
+   * setPayout — assigns who gets paid. No USDC moves here (money already
+   * moved in fundJob) — this just writes the split. IMPORTANT: this can
+   * only ever be called ONCE per job. There is no way to change it after —
+   * on-chain, a second call reverts with PayoutAlreadySet. Make sure the
+   * split is actually final (e.g. all pod members have approved) before
+   * calling this.
+   */
+  const setPayout = useCallback(async (jobUUID, recipients, shares, onStep = () => {}) => {
+    if (!walletClient)  return { success: false, error: 'Wallet not connected' };
+    if (!escrowAddress) return { success: false, error: 'Escrow contract not configured' };
+    if (!recipients?.length || recipients.length !== shares?.length) {
+      return { success: false, error: 'recipients and shares must be the same non-empty length' };
+    }
+    const totalShare = shares.reduce((s, v) => s + Number(v), 0);
+    if (totalShare !== 100) {
+      return { success: false, error: `shares must sum to 100 (got ${totalShare})` };
+    }
+
+    try {
+      await ensureChain();
+      onStep('payout', 'pending');
+      const data = encodeFunctionData({
+        abi: ESCROW_ABI,
+        functionName: 'setPayout',
+        args: [toJobId(jobUUID), recipients, shares.map(s => BigInt(s))],
+      });
+      const txHash = await sendRawTx(escrowAddress, data);
+      onStep('payout', 'confirming');
+      await waitForTransactionReceipt(config, { hash: txHash, chainId: TARGET_CHAIN.id });
+      onStep('payout', 'done');
+      return { success: true, txHash };
+    } catch (err) {
+      onStep('error', 'error');
+      return { success: false, error: friendlyError(err) };
+    }
+  }, [walletClient, address, chainId, escrowAddress, config]);
 
   const confirmComplete = useCallback(async (jobUUID, onStep = () => {}) => {
     if (!walletClient)  return { success: false, error: 'Wallet not connected' };
@@ -346,17 +405,30 @@ export function useEscrow() {
         disputed: job.disputed,
         fundedAt: Number(job.fundedAt),
         timeoutDeadline: Number(job.timeoutDeadline),
+        feeBpsAtFund: Number(job.feeBpsAtFund),
+        feeRecipientAtFund: job.feeRecipientAtFund,
       };
     } catch { return null; }
   }, [publicClient, escrowAddress]);
 
+  const getPayout = useCallback(async (jobUUID) => {
+    try {
+      const [recipients, shares] = await publicClient.readContract({
+        address: escrowAddress, abi: ESCROW_ABI, functionName: 'getPayout', args: [toJobId(jobUUID)],
+      });
+      return { recipients, shares: shares.map(s => Number(s)) };
+    } catch { return { recipients: [], shares: [] }; }
+  }, [publicClient, escrowAddress]);
+
   return {
     fundJob,
+    setPayout,
     confirmComplete,
     claim,
     raiseDispute,
     getJobStatus,
     getJob,
+    getPayout,
     isConnected: !!walletClient,
     connectedAddress: address,
     networkName: TARGET_CHAIN.name,

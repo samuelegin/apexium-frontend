@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Users, DollarSign, ChevronRight } from 'lucide-react';
+import { Calendar, Users, DollarSign, ChevronRight, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 
 const categoryLabels = {
@@ -10,18 +10,20 @@ const categoryLabels = {
 };
 
 const statusStyles = {
+  draft:       'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
   open:        'bg-primary/10 text-primary',
   in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
   completed:   'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400',
 };
 
 const statusLabels = {
+  draft:       'Draft — not funded',
   open:        'Open',
   in_progress: 'Active',
   completed:   'Completed',
 };
 
-export default function JobCard({ job }) {
+export default function JobCard({ job, footerAction }) {
   return (
     <Link to={`/job/${job.id}`} className="block group">
       <div className="rounded-2xl border border-border bg-card p-4 md:p-5 transition-all hover:border-primary/30 hover:bg-secondary/20">
@@ -32,7 +34,8 @@ export default function JobCard({ job }) {
                 {categoryLabels[job.category] || job.category}
               </span>
               {job.status && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyles[job.status] || 'bg-secondary text-muted-foreground'}`}>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${statusStyles[job.status] || 'bg-secondary text-muted-foreground'}`}>
+                  {job.status === 'draft' ? <ShieldAlert className="w-3 h-3" /> : job.status === 'open' && <ShieldCheck className="w-3 h-3" />}
                   {statusLabels[job.status] || job.status}
                 </span>
               )}
@@ -63,6 +66,12 @@ export default function JobCard({ job }) {
             <span>{job.applicant_count || 0} applied</span>
           </div>
         </div>
+
+        {footerAction && (
+          <div onClick={(e) => e.preventDefault()} className="mt-3 pt-3 border-t border-border/60">
+            {footerAction}
+          </div>
+        )}
       </div>
     </Link>
   );

@@ -4,10 +4,90 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import JobCard from '@/components/shared/JobCard';
-import { Briefcase, UserCheck, ClipboardList, Trash2, Loader2, Search, Plus } from 'lucide-react';
-import { Application, Job } from '@/api/entities';
+import TxProgressModal from '@/components/shared/TxProgressModal';
+import { Briefcase, UserCheck, ClipboardList, Trash2, Loader2, Search, Plus, Wallet } from 'lucide-react';
+import { Application, Job, Escrow as EscrowApi } from '@/api/entities';
+import { useEscrow } from '@/hooks/useEscrow';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+
+/* ── Fund Job button (employer, draft jobs only) ─────────────────────────────
+ * Turns a private draft into a real, marketplace-visible job. Calls
+ * fundJob(jobId, amount) — approve then send, two separate signed txs, no
+ * recipient needed yet (that's a later setPayout() at selection time). */
+function FundJobButton({ job }) {
+  const queryClient = useQueryClient();
+  const escrow = useEscrow();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [status, setStatus] = useState({});
+  const [error, setError] = useState(null);
+
+  const STEPS = [
+    { key: 'approve', label: 'Approve USDC' },
+    { key: 'fund',    label: 'Fund escrow' },
+  ];
+
+  const fundMutation = useMutation({
+    mutationFn: async () => {
+      setStatus({});
+      setError(null);
+      setModalOpen(true);
+      const result = await escrow.fundJob(job.id, job.payment_amount, (key, s) => {
+        if (key === 'error') return;
+        setStatus(prev => ({ ...prev, [key]: s }));
+      });
+      if (!result.success) {
+        setError(result.error);
+        throw new Error(result.error || 'Funding failed');
+      }
+      try { await EscrowApi.notify(job.id, result.txHash, 'fund'); } catch (_) {}
+      await Job.update(job.id, {
+        status: 'open',
+        escrow_funded: true,
+        escrow_tx_hash: result.txHash,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Job funded — now visible in the marketplace');
+      setModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['my-employer-jobs'] });
+    },
+    onError: (err) => toast.error(err.message || 'Funding failed'),
+  });
+
+  if (job.status !== 'draft') return null;
+
+  if (!escrow.isConnected) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Wallet className="w-3.5 h-3.5" /> Connect your wallet to fund this job
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => fundMutation.mutate()}
+        disabled={fundMutation.isPending}
+        className="w-full flex items-center justify-center gap-2 h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+      >
+        {fundMutation.isPending
+          ? <><Loader2 className="w-4 h-4 animate-spin" /> Funding…</>
+          : <><Wallet className="w-4 h-4" /> Fund Job — ${job.payment_amount}</>}
+      </button>
+      <TxProgressModal
+        open={modalOpen}
+        title="Fund this job"
+        subtitle={`$${job.payment_amount} USDC — this makes it visible in the marketplace`}
+        steps={STEPS}
+        status={status}
+        error={error}
+        onClose={() => setModalOpen(false)}
+      />
+    </>
+  );
+}
 
 /* ── Delete button (employer only, open jobs) ───────────────────────────────── */
 function DeleteJobButton({ job }) {
@@ -24,7 +104,7 @@ function DeleteJobButton({ job }) {
     onError: () => toast.error('Failed to delete job'),
   });
 
-  if (job.status !== 'open') return null;
+  if (job.status !== 'open' && job.status !== 'draft') return null;
 
   return (
     <>
@@ -94,7 +174,7 @@ function TabBtn({ active, onClick, icon: Icon, label, count }) {
 }
 
 /* ── Job list renderer ──────────────────────────────────────────────────────── */
-function JobList({ jobs, isLoading, emptyMessage, emptyTo, emptyCta, showDelete }) {
+function JobList({ jobs, isLoading, emptyMessage, emptyTo, emptyCta, showDelete, showFund }) {
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -124,7 +204,7 @@ function JobList({ jobs, isLoading, emptyMessage, emptyTo, emptyCta, showDelete 
     <div className="space-y-3">
       {jobs.map(job => (
         <div key={job.id} className="relative group">
-          <JobCard job={job} />
+          <JobCard job={job} footerAction={showFund ? <FundJobButton job={job} /> : undefined} />
           {showDelete && (
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
               <DeleteJobButton job={job} />
@@ -208,6 +288,7 @@ export default function MyJobs() {
             emptyTo="/post-job"
             emptyCta={<><Plus className="w-4 h-4" /> Post First Job</>}
             showDelete
+            showFund
           />
         )}
         {tab === 'jobber' && (
