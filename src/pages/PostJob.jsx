@@ -116,7 +116,10 @@ export default function PostJob() {
       const jobUUID = uuidv4(); // becomes the on-chain jobId once funded later
 
       const maxWeight  = Math.max(...kpis.map(k => Number(k.weight)));
-      const kpiSummary = kpis
+      // .slice() first — .sort() mutates in place, and kpis is the component's
+      // live state array, so sorting it directly here silently reorders the
+      // KPI list on screen as a side effect of computing a summary string.
+      const kpiSummary = [...kpis]
         .sort((a, b) => Number(b.weight) - Number(a.weight))
         .slice(0, 2)
         .map(k => `${k.name} (${k.weight}%)`)
@@ -136,18 +139,31 @@ export default function PostJob() {
         escrow_funded:     false,
       });
 
-      await KPI.bulkCreate(
-        kpis.map(k => ({
-          job_id:             job.id,
-          name:               k.name,
-          target_value:       k.target_value,
-          weight:             Number(k.weight),
-          baseline:           k.baseline || '',
-          is_primary:         Number(k.weight) === maxWeight,
-          status:             'not_started',
-          completion_percent: 0,
-        }))
-      );
+      // Job creation and KPI creation are two separate requests, so a failure
+      // in the second one used to leave an orphaned draft behind — a job row
+      // with zero KPIs, and no automatic way to clean it up. That's what was
+      // producing the stuck/duplicate drafts: each failed attempt left a dead
+      // job, and the only way forward was to try posting again. Now, if the
+      // KPI bulk-create fails, we delete the just-created job so the attempt
+      // fails cleanly and atomically from the user's point of view — nothing
+      // is left behind to retry around.
+      try {
+        await KPI.bulkCreate(
+          kpis.map(k => ({
+            job_id:             job.id,
+            name:               k.name,
+            target_value:       k.target_value,
+            weight:             Number(k.weight),
+            baseline:           k.baseline || '',
+            is_primary:         Number(k.weight) === maxWeight,
+            status:             'not_started',
+            completion_percent: 0,
+          }))
+        );
+      } catch (err) {
+        await Job.delete(job.id).catch(() => {});
+        throw err;
+      }
 
       return job;
     },
