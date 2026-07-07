@@ -146,12 +146,18 @@ export default function JobDetail() {
           : `@${user.username || user.full_name} applied to "${job.title}"`,
         job_id: jobId,
       });
+
+      return { isPod };
     },
     onSuccess: () => {
-      toast.success('Application submitted!');
+      toast.success("Application submitted! Redirecting to My Jobs…");
+      // Don't wait on a refetch round-trip — flip the UI immediately so the
+      // apply form is gone and there's no window left to double-submit.
+      queryClient.setQueryData(['my-application', jobId, user?.email], (prev) => prev ?? { status: 'pending' });
       queryClient.invalidateQueries({ queryKey: ['my-application'] });
       queryClient.invalidateQueries({ queryKey: ['job-applications'] });
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      navigate('/my-jobs');
     },
     onError: (err) => toast.error(err.message || 'Submission failed.'),
   });
@@ -403,7 +409,17 @@ export default function JobDetail() {
       )}
 
       {/* Apply section */}
-      {!isEmployer && job.status === 'open' && !myApplication && (
+      {!isEmployer && job.status === 'open' && !myApplication && !user?.wallet_address && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5">
+          <div className="flex items-center gap-2 text-sm text-foreground">
+            <Info className="w-4 h-4 text-primary shrink-0" />
+            Connect your wallet before applying — it's how you get paid if selected.
+          </div>
+          <WalletButton compact />
+        </div>
+      )}
+
+      {!isEmployer && job.status === 'open' && !myApplication && user?.wallet_address && (
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
           <h2 className="text-base font-semibold text-foreground">Apply for this job</h2>
 
