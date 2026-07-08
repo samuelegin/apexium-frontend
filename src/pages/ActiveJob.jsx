@@ -188,7 +188,7 @@ export default function ActiveJob() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">KPI Task Board</h2>
-            {isJobber && !isOverdue && !job.extension_requested && (
+            {isJobber && !isOverdue && !job.extension_requested && job.status !== 'completed' && (
               <button
                 onClick={() => setShowExtension(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
