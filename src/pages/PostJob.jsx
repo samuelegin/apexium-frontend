@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useMode } from '@/lib/ModeContext';
@@ -93,6 +93,14 @@ export default function PostJob() {
 
   const totalWeight = kpis.reduce((sum, k) => sum + (Number(k.weight) || 0), 0);
 
+  // publishMutation.isPending only becomes true after mutate() causes a
+  // re-render — a fast double-tap can fire this handler twice before the
+  // button's `disabled` prop actually updates in the DOM, kicking off two
+  // full job+KPI create flows and leaving two duplicate drafts behind. This
+  // ref flips synchronously, the instant the handler runs, so the second tap
+  // is rejected even within the same render pass.
+  const isSubmittingRef = useRef(false);
+
   const canNext = () => {
     if (step === 1) return title.trim() && category;
     if (step === 2) return kpis.every(k => k.name && k.target_value && k.weight) && totalWeight === 100;
@@ -170,8 +178,10 @@ export default function PostJob() {
     onSuccess: () => {
       toast.success('Draft saved — fund it from My Jobs to publish it to the marketplace');
       navigate('/my-jobs');
+      // no reset here on purpose — we're navigating away from this form
     },
     onError: (err) => {
+      isSubmittingRef.current = false; // allow retry after a genuine failure
       const msg = err.message ?? 'Failed to publish job';
       toast.error(msg);
     },
@@ -347,7 +357,11 @@ export default function PostJob() {
           </button>
         ) : (
           <button
-            onClick={() => publishMutation.mutate()}
+            onClick={() => {
+              if (isSubmittingRef.current) return; // second tap of a double-tap — ignored
+              isSubmittingRef.current = true;
+              publishMutation.mutate();
+            }}
             disabled={!canNext() || publishMutation.isPending}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
