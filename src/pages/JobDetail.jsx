@@ -90,6 +90,18 @@ export default function JobDetail() {
   const podValid         = applyMode === 'individual'
     || (podName.trim() && podMembers.length >= 2 && podMembers.length <= 5 && podTotalShare === 100);
 
+  // Jobs that are in_progress/completed live on the Active Job Board, not
+  // this apply/browse page. This used to show a static "This job is active"
+  // screen (mislabeled — it says "active" even for completed jobs) requiring
+  // a manual button click to get to the claim/KPI UI. Redirect immediately
+  // instead, so clicking into a completed job from My Jobs goes straight to
+  // where you can actually claim payment.
+  useEffect(() => {
+    if (job && (job.status === 'in_progress' || job.status === 'completed') && (isEmployer || isSelectedJobber)) {
+      navigate(`/active-job/${jobId}`, { replace: true });
+    }
+  }, [job, isEmployer, isSelectedJobber, jobId, navigate]);
+
   /* ── Mutations ───────────────────────────────────────────────────────────── */
   const applyMutation = useMutation({
     mutationFn: async () => {
@@ -281,18 +293,14 @@ export default function JobDetail() {
   }
 
   if ((job.status === 'in_progress' || job.status === 'completed') && (isEmployer || isSelectedJobber)) {
+    // useEffect above redirects immediately — this only ever paints for a
+    // single frame while that fires, so keep it minimal rather than a
+    // dead-end screen with a manual button to click.
     return (
-      <div className="text-center py-16 space-y-4">
-        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-          <CheckCircle2 className="w-7 h-7 text-primary" />
-        </div>
-        <p className="text-foreground font-medium">This job is active</p>
-        <button
-          onClick={() => navigate(`/active-job/${jobId}`)}
-          className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-        >
-          Go to Active Job Board
-        </button>
+      <div className="max-w-3xl mx-auto space-y-4 pb-8">
+        <Skeleton className="h-6 w-24 rounded-lg" />
+        <Skeleton className="h-10 w-3/4 rounded-lg" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
     );
   }

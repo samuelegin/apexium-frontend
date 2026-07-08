@@ -24,8 +24,14 @@ const statusLabels = {
 };
 
 export default function JobCard({ job, footerAction }) {
+  // in_progress / completed jobs live on the Active Job Board — link there
+  // directly instead of through the apply/browse page, which for these
+  // statuses only exists to redirect you onward anyway.
+  const isLive = job.status === 'in_progress' || job.status === 'completed';
+  const href    = isLive ? `/active-job/${job.id}` : `/job/${job.id}`;
+
   return (
-    <Link to={`/job/${job.id}`} className="block group">
+    <Link to={href} className="block group">
       <div className="rounded-2xl border border-border bg-card p-4 md:p-5 transition-all hover:border-primary/30 hover:bg-secondary/20">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
